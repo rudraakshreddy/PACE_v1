@@ -1,0 +1,27 @@
+Osmotic Coefficients of Various Water Types
+This document summarizes the osmotic coefficients for various water sources commonly analyzed in water treatment and membrane science (e.g., Reverse Osmosis design).
+1. Thermodynamic Osmotic Coefficients (φ)
+The thermodynamic osmotic coefficient (φ) accounts for the non-ideal behavior of solutions with high ionic strength. In perfectly ideal, highly dilute solutions, φ = 1.0. As salinity increases, the coefficient drops. The following table provides standard literature values at 25°C:
+Water Type
+Typical Salinity (TDS)
+Thermodynamic Osmotic Coefficient (φ)
+Seawater
+~35,000 mg/L
+0.90
+Brackish Water
+1,000 – 10,000 mg/L
+0.93
+Wastewater Reuse
+500 – 1,500 mg/L
+~0.95
+Well / Groundwater
+100 – 1,000 mg/L
+0.95 – 0.98
+Tap / Municipal
+50 – 500 mg/L
+0.98 – 1.0 (Approximates ideal behavior)
+Note: For highly dilute sources (Tap, Well, and most Wastewater Reuse), engineers generally assume φ = 1 when calculating osmotic pressure using the extended van 't Hoff equation.
+2. Empirical Osmotic Pressure Rule of Thumb
+In industry practice, membrane manufacturers often use a simplified linear coefficient based strictly on Total Dissolved Solids (TDS) rather than calculating individual ion molalities.
+Standard Approximation: 1,000 mg/L of TDS generates approximately 0.7 bar (or ~10 to 11.3 psi) of osmotic pressure.
+While seawater deviates more from ideal behavior, this linear coefficient serves as the standard industry shortcut for estimating the osmotic forces in brackish, well, tap, and wastewater streams.

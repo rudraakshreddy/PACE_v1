@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PACE — PFD Generator | Permionics</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Calibri,sans-serif;background:#f5f7fa;display:flex;height:100vh;overflow:hidden;color:#0d2240}
+.panel{width:268px;padding:20px 18px;background:#ffffff;border-right:2px solid #e3eaf0;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
+.brand{font-size:16px;font-weight:700;color:#0d2240;margin-bottom:2px;letter-spacing:.3px}
+.sub{font-size:9px;font-weight:600;color:#1a7a8f;letter-spacing:1px;text-transform:uppercase;margin-bottom:24px}
+.lbl{font-size:9px;font-weight:700;color:#0d2240;letter-spacing:.6px;text-transform:uppercase;margin-bottom:4px}
+.hint{font-size:10px;color:#6e8094;margin-bottom:5px;line-height:1.4}
+input[type=text]{width:100%;padding:7px 10px;font-size:12px;border:1.5px solid #dde3ea;border-radius:6px;font-family:Calibri,sans-serif;color:#0d2240;background:#fff;margin-bottom:16px;outline:none;transition:border-color .15s}
+input[type=text]:focus{border-color:#1a7a8f}
+.sys-btns{display:flex;gap:7px;margin-bottom:18px}
+.sys-btn{flex:1;padding:8px 4px;font-size:11px;border-radius:6px;cursor:pointer;background:transparent;color:#0d2240;border:2px solid #0d2240;font-family:Calibri,sans-serif;font-weight:400;transition:all .15s}
+.sys-btn.active{background:#0d2240;color:#fff;font-weight:700}
+.el-row{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.el-btn{width:30px;height:30px;border:1.5px solid #0d2240;border-radius:5px;background:transparent;color:#0d2240;font-size:18px;cursor:pointer;line-height:1;font-family:Calibri,sans-serif;transition:background .15s}
+.el-btn:hover{background:#f0f4f8}
+.el-val{flex:1;text-align:center;font-size:22px;font-weight:700;color:#0d2240}
+.chk-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;font-size:11px;color:#0d2240;user-select:none}
+.chk-row input[type=checkbox]{cursor:pointer;accent-color:#1a7a8f;width:13px;height:13px}
+.divider{border:none;border-top:1.5px solid #e3eaf0;margin:18px 0 14px}
+.legend-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:10px;color:#3a4a5c}
+.legend-line{flex-shrink:0}
+.canvas{flex:1;overflow:auto;padding:16px;background:#f0f4f8}
+.top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.cfg-label{font-size:10.5px;color:#6e8094;font-family:Calibri,sans-serif}
+.export-btn{padding:7px 16px;font-size:10.5px;background:#0d2240;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:Calibri,sans-serif;font-weight:600;transition:opacity .15s}
+.export-btn:hover{opacity:.88}
+svg{background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.09);display:block}
+.section-gap{margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<!-- Left Panel -->
+<div class="panel">
+  <div class="brand">PACE</div>
+  <div class="sub">PFD Generator</div>
+
+  <div class="lbl">System Type</div>
+  <div class="sys-btns">
+    <button class="sys-btn active" id="btn-single" onclick="setSys('single')">Single-Pass</button>
+    <button class="sys-btn" id="btn-two" onclick="setSys('two')">Two-Pass</button>
+  </div>
+
+  <div class="lbl" id="lbl-p1">Stage Array</div>
+  <div class="hint">Vessels per stage, comma-separated<br>e.g. 4,2,1 or 6,3</div>
+  <input type="text" id="p1-inp" value="4,2,1" oninput="draw()">
+
+  <div id="p2-block" style="display:none">
+    <div class="lbl">Pass 2 Array</div>
+    <div class="hint">Vessels per stage</div>
+    <input type="text" id="p2-inp" value="2" oninput="draw()">
+  </div>
+
+  <div class="lbl">Elements / Vessel</div>
+  <div class="el-row">
+    <button class="el-btn" onclick="changeEl(-1)">−</button>
+    <div class="el-val" id="el-val">6</div>
+    <button class="el-btn" onclick="changeEl(1)">+</button>
+  </div>
+
+  <div id="booster-block" style="display:none">
+    <div class="lbl section-gap">Interstage Boosters</div>
+    <div id="booster-chks"></div>
+    <div style="margin-bottom:10px"></div>
+  </div>
+
+  <div id="recycle-block" style="display:none">
+    <label class="chk-row">
+      <input type="checkbox" id="recycle-chk" onchange="draw()">
+      P2 Concentrate Recycle
+    </label>
+    <div style="margin-bottom:8px"></div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="lbl" style="margin-bottom:10px">Legend</div>
+  <div class="legend-row">
+    <svg class="legend-line" width="24" height="5"><line x1="0" y1="2.5" x2="24" y2="2.5" stroke="#1565c0" stroke-width="2.5"/></svg>
+    Feed / Concentrate
+  </div>
+  <div class="legend-row">
+    <svg class="legend-line" width="24" height="5"><line x1="0" y1="2.5" x2="24" y2="2.5" stroke="#1b5e20" stroke-width="2" stroke-dasharray="5,2"/></svg>
+    Permeate
+  </div>
+  <div class="legend-row">
+    <svg class="legend-line" width="24" height="5"><line x1="0" y1="2.5" x2="24" y2="2.5" stroke="#00695c" stroke-width="2" stroke-dasharray="6,3"/></svg>
+    Recycle (dashed)
+  </div>
+
+  <div style="margin-top:auto;padding-top:20px;font-size:9px;color:#9eaab8;line-height:1.5">
+    Permionics Membranes Pvt. Ltd.<br>
+    PACE v1.0 — PFD Auto-Generator
+  </div>
+</div>
+
+<!-- SVG Canvas -->
+<div class="canvas">
+  <div class="top-bar">
+    <span class="cfg-label" id="cfg-label">Single-Pass · 4:2:1 array · 6E/vessel</span>
+    <button class="export-btn" onclick="exportSVG()">↓ Export SVG</button>
+  </div>
+  <div id="svg-container"></div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let sys = 'single', nEl = 6;
+const boosterState = {};
+
+// ── Layout constants ─────────────────────────────────────────────────────────
+const N = {VW:158, VH:33, VGY:13, SGX:112, HW:19, PR:20, FW:27, FH:50, ML:64, MT:70, PP:90};
+const stH = n => n * N.VH + (n - 1) * N.VGY;
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function parseArr(s) {
+  return s.split(',').map(t => {
+    const n = parseInt(t.trim(), 10);
+    return (!n || n < 1) ? 1 : n;
+  });
+}
+
+function line(x1,y1,x2,y2,stroke,sw=2.5,extra='') {
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" ${extra}/>`;
+}
+function txt(x,y,t,anchor='middle',fill='#0d2240',fs=8.5,fw='normal') {
+  return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="Calibri,sans-serif" font-size="${fs}" fill="${fill}" font-weight="${fw}">${t}</text>`;
+}
+function rect(x,y,w,h,rx,fill,stroke,sw=1.8) {
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+}
+
+// ── SVG Symbols ──────────────────────────────────────────────────────────────
+function feedSym(cx, cy) {
+  return `<g>
+    <path d="M${cx},${cy-18} L${cx-14},${cy+13} L${cx+14},${cy+13}Z" fill="#daeef4" stroke="#0d2240" stroke-width="2"/>
+    ${txt(cx, cy+27, 'Feed', 'middle', '#0d2240', 9)}
+  </g>`;
+}
+
+function filterSym(cx, cy, lbl) {
+  const [w, h] = [N.FW, N.FH];
+  let ls = '';
+  [0.27, 0.51, 0.75].forEach(f => {
+    ls += `<line x1="${cx-w/2+4}" y1="${cy-h/2+h*f}" x2="${cx+w/2-4}" y2="${cy-h/2+h*f}" stroke="#1a7a8f" stroke-width="1.6"/>`;
+  });
+  return `<g>
+    ${rect(cx-w/2, cy-h/2, w, h, 2, '#fff', '#0d2240')}
+    <ellipse cx="${cx}" cy="${cy-h/2}" rx="${w/2}" ry="4.5" fill="#daeef4" stroke="#0d2240" stroke-width="1.5"/>
+    ${ls}
+    ${txt(cx, cy+h/2+14, lbl, 'middle', '#0d2240', 8.5)}
+  </g>`;
+}
+
+function pumpSym(cx, cy, lbl, tag, color='#0d2240') {
+  const r = N.PR;
+  return `<g>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" stroke="${color}" stroke-width="2.2"/>
+    <polygon points="${cx-r*0.55},${cy-r*0.55} ${cx-r*0.55},${cy+r*0.55} ${cx+r*0.70},${cy}" fill="${color}"/>
+    ${lbl ? txt(cx, cy+r+14, lbl, 'middle', '#0d2240', 8) : ''}
+    ${tag ? txt(cx, cy+r+24, tag, 'middle', '#6e8094', 7.5) : ''}
+  </g>`;
+}
+
+function vesselSym(x, y, ne, si, vi) {
+  const ew = (N.VW - 18) / ne;
+  let divs = '';
+  for (let i = 0; i < ne - 1; i++) {
+    divs += `<line x1="${x+9+ew*(i+1)}" y1="${y+5}" x2="${x+9+ew*(i+1)}" y2="${y+N.VH-5}" stroke="#1a7a8f" stroke-width=".85" stroke-dasharray="3,2"/>`;
+  }
+  return `<g>
+    ${rect(x, y, N.VW, N.VH, N.VH/2, '#e3f2fd', '#0d2240')}
+    ${divs}
+    <rect x="${x-5}" y="${y+N.VH/2-3.5}" width="5" height="7" fill="#0d2240" rx="1"/>
+    <rect x="${x+N.VW}" y="${y+N.VH/2-3.5}" width="5" height="7" fill="#0d2240" rx="1"/>
+    <circle cx="${x+N.VW/2}" cy="${y+N.VH}" r="3.5" fill="#1b5e20"/>
+    ${txt(x+N.VW/2, y+N.VH/2+4.5, `S${si+1}·V${vi+1}·${ne}E`, 'middle', '#0d2240', 8, 'bold')}
+  </g>`;
+}
+
+function tankSym(cx, cy, lbl) {
+  return `<g>
+    ${rect(cx-22, cy-27, 44, 54, 2, '#daeef4', '#1a7a8f')}
+    <ellipse cx="${cx}" cy="${cy-27}" rx="22" ry="5.5" fill="#daeef4" stroke="#1a7a8f" stroke-width="1.6"/>
+    <ellipse cx="${cx}" cy="${cy+27}" rx="22" ry="5.5" fill="#daeef4" stroke="#1a7a8f" stroke-width="2"/>
+    ${lbl ? txt(cx, cy+27+17, lbl, 'middle', '#0d2240', 9) : ''}
+  </g>`;
+}
+
+function instrSym(cx, cy, type, tag) {
+  return `<g>
+    <circle cx="${cx}" cy="${cy}" r="11" fill="#fff" stroke="#0d2240" stroke-width="1.5"/>
+    ${txt(cx, cy+1.5, type, 'middle', '#0d2240', 6.5, 'bold')}
+    ${txt(cx, cy+9, tag, 'middle', '#6e8094', 6)}
+  </g>`;
+}
+
+function stageBadge(cx, topY, label, fill, textFill) {
+  const w = label.length > 9 ? 74 : 56;
+  return `<rect x="${cx-w/2}" y="${topY-23}" width="${w}" height="16" rx="4" fill="${fill}" opacity=".9"/>
+    ${txt(cx, topY-11, label, 'middle', textFill, 8.5, 'bold')}`;
+}
+
+// ── Layout Engine ────────────────────────────────────────────────────────────
+function buildLayout(p1Arr, p2Arr) {
+  const maxV1 = Math.max(...p1Arr);
+  const p1CY  = N.MT + 44 + stH(maxV1) / 2;
+  const feedX = N.ML, filtX = N.ML + N.PP, hpX = N.ML + 2*N.PP, sx0 = hpX + 72;
+
+  let cur = sx0;
+  const p1 = p1Arr.map((nv, si) => {
+    const stX = cur, topY = p1CY - stH(nv) / 2;
+    const vs = Array.from({length: nv}, (_, vi) => ({x: stX + N.HW, y: topY + vi*(N.VH + N.VGY)}));
+    cur = stX + N.HW + N.VW + N.HW + N.SGX;
+    if (si < p1Arr.length - 1 && boosterState[si]) cur += N.PR*2 + 32;
+    return {si, nv, stX, topY, vs, fhX: stX, chX: stX + N.HW + N.VW};
+  });
+  const lastP1 = p1[p1.length - 1];
+  const p1Rx  = lastP1.chX + N.HW;
+  const permY = p1CY + stH(maxV1) / 2 + 54;
+
+  let p2d = null;
+  if (sys === 'two') {
+    const maxV2 = Math.max(...p2Arr);
+    const p2CY  = permY + 76 + stH(maxV2) / 2 + 34;
+    let cur2 = sx0;
+    const stgs = p2Arr.map((nv, si) => {
+      const stX = cur2, topY = p2CY - stH(nv) / 2;
+      const vs = Array.from({length: nv}, (_, vi) => ({x: stX + N.HW, y: topY + vi*(N.VH + N.VGY)}));
+      cur2 = stX + N.HW + N.VW + N.HW + N.SGX;
+      return {si, nv, stX, topY, vs, fhX: stX, chX: stX + N.HW + N.VW, p2CY};
+    });
+    const lastP2 = stgs[stgs.length - 1];
+    const p2Rx  = lastP2.chX + N.HW;
+    const p2PY  = p2CY + stH(maxV2) / 2 + 52;
+    p2d = {stgs, p2CY, p2Rx, p2PY, pumX: hpX, pumY: p2CY};
+  }
+
+  const rEdge = Math.max(p1Rx, p2d ? p2d.p2Rx : 0) + 156;
+  const bEdge = p2d ? p2d.p2PY + 92 : permY + 92;
+  return {feedX, filtX, hpX, p1, p1CY, permY, p1Rx, p2d, rEdge, bEdge};
+}
+
+// ── Main Draw ────────────────────────────────────────────────────────────────
+function draw() {
+  const p1Arr = parseArr(document.getElementById('p1-inp').value);
+  const p2Arr = parseArr(document.getElementById('p2-inp').value);
+  updateBoosters(p1Arr);
+
+  const recycle = document.getElementById('recycle-chk').checked;
+  const L = buildLayout(p1Arr, p2Arr);
+  const {feedX, filtX, hpX, p1, p1CY, permY, p1Rx, p2d, rEdge, bEdge} = L;
+
+  // Config label
+  let cfgTxt = `${sys === 'two' ? 'Two-Pass' : 'Single-Pass'} · ${p1Arr.join(':')} array · ${nEl}E/vessel`;
+  if (sys === 'two') cfgTxt += ` · P2: ${p2Arr.join(':')}`;
+  document.getElementById('cfg-label').textContent = cfgTxt;
+
+  let s = '';
+
+  // Grid pattern
+  s += `<defs>
+    <pattern id="gp" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0L0 0 0 20" fill="none" stroke="#e8eef3" stroke-width=".35"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#gp)"/>`;
+
+  // Title block
+  s += `<rect x="0" y="0" width="${rEdge}" height="50" fill="#f8fafc"/>`;
+  s += `<line x1="0" y1="50" x2="${rEdge}" y2="50" stroke="#e0e8f0" stroke-width="1"/>`;
+  s += txt(12, 20, 'PACE · Process Flow Diagram', 'start', '#0d2240', 13, 'bold');
+  s += txt(12, 36, 'Permionics Membranes Pvt. Ltd.  ·  Auto-generated from system configuration', 'start', '#6e8094', 9);
+  s += txt(rEdge - 12, 36, cfgTxt, 'end', '#9eaab8', 8.5);
+
+  // Feed backbone
+  s += line(feedX+14, p1CY, filtX-N.FW/2, p1CY, '#1565c0');
+  s += line(filtX+N.FW/2, p1CY, hpX-N.PR, p1CY, '#1565c0');
+  s += line(hpX+N.PR, p1CY, p1[0].fhX, p1CY, '#1565c0');
+
+  // Instruments
+  s += instrSym((feedX+filtX)/2, p1CY-25, 'PI', '101');
+  s += line((feedX+filtX)/2, p1CY-14, (feedX+filtX)/2, p1CY, '#adb5bd', 1);
+  s += instrSym(hpX+44, p1CY-25, 'PI', '102');
+  s += line(hpX+44, p1CY-14, hpX+44, p1CY, '#adb5bd', 1);
+
+  // Pretreatment
+  s += feedSym(feedX, p1CY);
+  s += filterSym(filtX, p1CY, 'CF-101');
+  s += pumpSym(hpX, p1CY, 'HP Pump', 'P-101');
+
+  // ── P1 Stages ──
+  p1.forEach((st, si) => {
+    const {nv, topY, vs, fhX, chX} = st;
+    const sH = stH(nv);
+    const cx = fhX + N.HW + N.VW/2;
+
+    s += stageBadge(cx, topY, 'Stage ' + (si+1), '#0d2240', '#fff');
+
+    // Feed manifold
+    s += `<line x1="${fhX+N.HW/2}" y1="${topY-4}" x2="${fhX+N.HW/2}" y2="${topY+sH+4}" stroke="#1565c0" stroke-width="5.5" stroke-linecap="round"/>`;
+    // Concentrate manifold
+    s += `<line x1="${chX+N.HW/2}" y1="${topY-4}" x2="${chX+N.HW/2}" y2="${topY+sH+4}" stroke="#b71c1c" stroke-width="5.5" stroke-linecap="round"/>`;
+
+    // Vessels + permeate drops
+    vs.forEach((v, vi) => {
+      s += vesselSym(v.x, v.y, nEl, si, vi);
+      s += line(v.x+N.VW/2, v.y+N.VH+4, v.x+N.VW/2, permY, '#1b5e20', 1.6, 'stroke-dasharray="4.5,2.5"');
+    });
+
+    // Interstage connection
+    const next = p1[si+1];
+    if (next) {
+      const fromX = chX + N.HW, toX = next.fhX, mid = (fromX + toX) / 2;
+      if (boosterState[si]) {
+        s += line(fromX, p1CY, mid-N.PR, p1CY, '#1565c0');
+        s += pumpSym(mid, p1CY, 'Booster', `P-10${si+2}`, '#1a7a8f');
+        s += line(mid+N.PR, p1CY, toX, p1CY, '#1565c0');
+      } else {
+        s += line(fromX, p1CY, toX, p1CY, '#1565c0');
+      }
+    }
+  });
+
+  // P1 permeate header
+  const p1PermLx = p1[0].vs[0].x + N.VW/2;
+  const p1PermRx = p1[p1.length-1].vs[0].x + N.VW/2;
+  s += line(p1PermLx, permY, p1PermRx, permY, '#1b5e20', 2.5);
+
+  // P1 concentrate outlet
+  {
+    const cX = p1Rx + 8;
+    s += line(p1Rx, p1CY, cX+52, p1CY, '#b71c1c');
+    s += `<polygon points="${cX+52},${p1CY-5.5} ${cX+52},${p1CY+5.5} ${cX+65},${p1CY}" fill="#b71c1c"/>`;
+    s += txt(cX+54, p1CY-12, 'Concentrate', 'start', '#b71c1c', 9, 'bold');
+  }
+
+  // ── Single-pass product ──
+  if (sys === 'single') {
+    s += line(p1PermRx, permY, p1PermRx+85, permY, '#1b5e20', 2.5);
+    s += tankSym(p1PermRx+108, permY, 'Product');
+  }
+
+  // ── Two-Pass ──
+  if (sys === 'two' && p2d) {
+    const {stgs, p2CY, p2PY, pumX, pumY} = p2d;
+    const maxV1 = Math.max(...p1Arr);
+    const maxV2 = Math.max(...p2Arr);
+
+    // Pass badges
+    s += `<rect x="${N.ML-5}" y="${N.MT+10}" width="34" height="17" rx="4" fill="#0d2240"/>`;
+    s += txt(N.ML+12, N.MT+22, 'PASS 1', 'middle', '#fff', 8, 'bold');
+    s += `<rect x="${N.ML-5}" y="${p2CY-stH(maxV2)/2-26}" width="34" height="17" rx="4" fill="#1a7a8f"/>`;
+    s += txt(N.ML+12, p2CY-stH(maxV2)/2-14, 'PASS 2', 'middle', '#fff', 8, 'bold');
+
+    // P1 permeate → P2 pump
+    s += `<path d="M ${p1PermLx} ${permY} L ${pumX} ${permY} L ${pumX} ${pumY-N.PR}" fill="none" stroke="#1b5e20" stroke-width="2.5"/>`;
+    s += pumpSym(pumX, pumY, 'P2 HP Pump', 'P-201', '#0d2240');
+    s += line(pumX+N.PR, p2CY, stgs[0].fhX, p2CY, '#1565c0');
+
+    // P2 stages
+    stgs.forEach((st, si) => {
+      const {nv, topY, vs, fhX, chX} = st;
+      const sH = stH(nv);
+      const cx = fhX + N.HW + N.VW/2;
+
+      s += stageBadge(cx, topY, 'P2 Stage ' + (si+1), '#1a7a8f', '#fff');
+      s += `<line x1="${fhX+N.HW/2}" y1="${topY-4}" x2="${fhX+N.HW/2}" y2="${topY+sH+4}" stroke="#1565c0" stroke-width="5.5" stroke-linecap="round"/>`;
+      s += `<line x1="${chX+N.HW/2}" y1="${topY-4}" x2="${chX+N.HW/2}" y2="${topY+sH+4}" stroke="#b71c1c" stroke-width="5.5" stroke-linecap="round"/>`;
+
+      vs.forEach((v, vi) => {
+        s += vesselSym(v.x, v.y, nEl, si, vi);
+        s += line(v.x+N.VW/2, v.y+N.VH+4, v.x+N.VW/2, p2PY, '#1b5e20', 1.6, 'stroke-dasharray="4.5,2.5"');
+      });
+
+      const next = stgs[si+1];
+      if (next) s += line(chX+N.HW, p2CY, next.fhX, p2CY, '#1565c0');
+    });
+
+    // P2 permeate header + product
+    const p2PermLx = stgs[0].vs[0].x + N.VW/2;
+    const p2PermRx = stgs[stgs.length-1].vs[0].x + N.VW/2;
+    s += line(p2PermLx, p2PY, p2PermRx, p2PY, '#1b5e20', 2.5);
+    s += line(p2PermRx, p2PY, p2PermRx+85, p2PY, '#1b5e20', 2.5);
+    s += tankSym(p2PermRx+108, p2PY, 'P2 Product');
+
+    // P2 concentrate / recycle
+    {
+      const lastP2 = stgs[stgs.length-1];
+      const cX = lastP2.chX + N.HW;
+      if (recycle) {
+        s += line(cX, p2CY, cX+38, p2CY, '#b71c1c');
+        s += `<path d="M ${cX+38} ${p2CY} L ${cX+38} ${p2CY+34} L ${filtX-N.FW/2-16} ${p2CY+34} L ${filtX-N.FW/2-16} ${p1CY}" fill="none" stroke="#00695c" stroke-width="2.2" stroke-dasharray="8,3.5"/>`;
+        s += `<circle cx="${filtX-N.FW/2-16}" cy="${p1CY}" r="4" fill="#00695c"/>`;
+        s += txt(cX+40, p2CY-11, '↩ Recycle → P1 Feed', 'start', '#00695c', 8.5);
+      } else {
+        s += line(cX, p2CY, cX+54, p2CY, '#b71c1c');
+        s += `<polygon points="${cX+54},${p2CY-5.5} ${cX+54},${p2CY+5.5} ${cX+67},${p2CY}" fill="#b71c1c"/>`;
+        s += txt(cX+56, p2CY-12, 'P2 Concentrate', 'start', '#b71c1c', 9, 'bold');
+      }
+    }
+  }
+
+  const svgOut = `<svg id="pfd-svg" viewBox="0 0 ${rEdge} ${bEdge}" width="${rEdge}" height="${bEdge}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  document.getElementById('svg-container').innerHTML = svgOut;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setSys(v) {
+  sys = v;
+  document.getElementById('btn-single').classList.toggle('active', v === 'single');
+  document.getElementById('btn-two').classList.toggle('active', v === 'two');
+  document.getElementById('p2-block').style.display    = v === 'two' ? 'block' : 'none';
+  document.getElementById('recycle-block').style.display = v === 'two' ? 'block' : 'none';
+  document.getElementById('lbl-p1').textContent = v === 'two' ? 'Pass 1 Array' : 'Stage Array';
+  draw();
+}
+
+function changeEl(d) {
+  nEl = Math.min(6, Math.max(1, nEl + d));
+  document.getElementById('el-val').textContent = nEl;
+  draw();
+}
+
+function updateBoosters(p1Arr) {
+  const cont = document.getElementById('booster-chks');
+  cont.innerHTML = '';
+  if (p1Arr.length < 2) { document.getElementById('booster-block').style.display = 'none'; return; }
+  document.getElementById('booster-block').style.display = 'block';
+  p1Arr.slice(1).forEach((_, i) => {
+    const lbl = document.createElement('label');
+    lbl.className = 'chk-row';
+    lbl.innerHTML = `<input type="checkbox" ${boosterState[i] ? 'checked' : ''}> Booster: Stage ${i+1} → ${i+2}`;
+    lbl.querySelector('input').addEventListener('change', e => { boosterState[i] = e.target.checked; draw(); });
+    cont.appendChild(lbl);
+  });
+}
+
+function exportSVG() {
+  const el = document.getElementById('pfd-svg');
+  if (!el) return;
+  const blob = new Blob([el.outerHTML], {type: 'image/svg+xml'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'PACE_PFD.svg'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Initial render
+draw();
+</script>
+</body>
+</html>

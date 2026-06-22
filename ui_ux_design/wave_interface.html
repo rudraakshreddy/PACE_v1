@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAVE-Like Interface | Industrial Desalination</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f32',
+                            900: '#0f172a',
+                        },
+                        brand: {
+                            500: '#2563eb',
+                            600: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom CSS for specific elements -->
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: #f8fafc; }
+        .process-arrow {
+            position: relative;
+            width: 40px;
+            height: 2px;
+            background: #cbd5e1;
+            margin: 0 10px;
+        }
+        .process-arrow::after {
+            content: '';
+            position: absolute;
+            right: -2px;
+            top: -4px;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 5px solid #cbd5e1;
+        }
+        
+        /* Shadcn-like input styling */
+        .shad-input {
+            width: 100%;
+            height: 36px;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        .shad-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+
+        /* Loading Spinner */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Toast Animation */
+        @keyframes slideInUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .toast-enter {
+            animation: slideInUp 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-slate-800 overflow-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white h-14 flex items-center justify-between px-6 shrink-0 border-b border-slate-800">
+        <div class="flex items-center gap-4">
+            <i data-lucide="droplets" class="text-blue-400 w-6 h-6"></i>
+            <div>
+                <h1 class="font-semibold text-sm tracking-wide">Industrial Desalination Plant X</h1>
+                <p class="text-xs text-slate-400">Customized Membrane Solutions</p>
+            </div>
+            <span class="ml-4 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium border border-emerald-500/30">Validated</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <button class="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center gap-2">
+                <i data-lucide="save" class="w-4 h-4"></i> Save
+            </button>
+            <button class="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center gap-2">
+                <i data-lucide="file-down" class="w-4 h-4"></i> Export Report
+            </button>
+            <button id="run-simulation-btn" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 shadow-sm">
+                <i data-lucide="play" class="w-4 h-4" id="run-icon"></i> <span id="run-text">Run Simulation</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Application Layout -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Left Sidebar (Project Wizard) -->
+        <aside class="w-64 bg-slate-50 border-r border-slate-200 flex flex-col">
+            <div class="p-4 border-b border-slate-200">
+                <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Project Workflow</h2>
+            </div>
+            <nav class="flex-1 p-3 space-y-1">
+                <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 hover:bg-slate-100 transition-colors text-left">
+                    <i data-lucide="info" class="w-4 h-4 text-slate-400"></i> Project Info
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 hover:bg-slate-100 transition-colors text-left">
+                    <i data-lucide="flask-conical" class="w-4 h-4 text-slate-400"></i> Water Chemistry
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md bg-blue-50 text-brand-600 border border-blue-100 transition-colors text-left">
+                    <i data-lucide="git-merge" class="w-4 h-4 text-brand-500"></i> Process Configuration
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-slate-600 hover:bg-slate-100 transition-colors text-left">
+                    <i data-lucide="calculator" class="w-4 h-4 text-slate-400"></i> System Summary & Costing
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="flex-1 flex flex-col bg-white overflow-y-auto">
+            
+            <!-- Visual Process Train Canvas -->
+            <div class="h-64 border-b border-slate-200 bg-slate-50/50 p-6 flex flex-col">
+                <h2 class="text-sm font-semibold mb-6 flex items-center gap-2"><i data-lucide="workflow" class="w-4 h-4 text-slate-500"></i> Process Train Flow</h2>
+                
+                <div class="flex items-center overflow-x-auto pb-4 pt-2 px-2">
+                    
+                    <!-- Block: Intake/Feed -->
+                    <div class="process-block flex-shrink-0 w-44 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-brand-400 cursor-pointer transition-all">
+                        <div class="p-3 border-b border-slate-100 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500"><i data-lucide="waves" class="w-4 h-4"></i></div>
+                            <span class="font-medium text-sm">Intake/Feed</span>
+                        </div>
+                        <div class="p-3 bg-slate-50/50 text-xs text-slate-500 rounded-b-lg">
+                            <div class="flex justify-between mb-1"><span>Flow:</span> <span class="font-medium text-slate-700">100 m³/h</span></div>
+                            <div class="flex justify-between"><span>Temp:</span> <span class="font-medium text-slate-700">25 °C</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="process-arrow"></div>
+                    
+                    <!-- Block: Ultrafiltration -->
+                    <div class="process-block flex-shrink-0 w-44 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-brand-400 cursor-pointer transition-all">
+                        <div class="p-3 border-b border-slate-100 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-teal-50 flex items-center justify-center text-teal-600"><i data-lucide="filter" class="w-4 h-4"></i></div>
+                            <span class="font-medium text-sm">Ultrafiltration</span>
+                        </div>
+                        <div class="p-3 bg-slate-50/50 text-xs text-slate-500 rounded-b-lg">
+                            <div class="flex justify-between mb-1"><span>Flux:</span> <span class="font-medium text-slate-700">55 LMH</span></div>
+                            <div class="flex justify-between"><span>Recovery:</span> <span class="font-medium text-slate-700">95%</span></div>
+                        </div>
+                    </div>
+
+                    <div class="process-arrow"></div>
+
+                    <!-- Block: Reverse Osmosis (Active) -->
+                    <div class="process-block flex-shrink-0 w-44 bg-white border-2 border-brand-500 rounded-lg shadow-md cursor-pointer transition-all relative">
+                        <div class="absolute -top-2 -right-2 w-5 h-5 bg-slate-200 hover:bg-red-500 hover:text-white text-slate-500 rounded-full flex items-center justify-center text-[10px] cursor-pointer transition-colors shadow-sm"><i data-lucide="x" class="w-3 h-3"></i></div>
+                        <div class="p-3 border-b border-slate-100 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-brand-50 flex items-center justify-center text-brand-600"><i data-lucide="layers" class="w-4 h-4"></i></div>
+                            <span class="font-medium text-sm text-brand-700">Reverse Osmosis</span>
+                        </div>
+                        <div class="p-3 bg-brand-50/30 text-xs text-slate-500 rounded-b-lg">
+                            <div class="flex justify-between mb-1"><span>Flux:</span> <span class="font-medium text-slate-700">14 gfd</span></div>
+                            <div class="flex justify-between"><span>Recovery:</span> <span class="font-medium text-slate-700">75%</span></div>
+                        </div>
+                    </div>
+
+                    <div class="process-arrow"></div>
+
+                    <!-- Block: Ion Exchange -->
+                    <div class="process-block flex-shrink-0 w-44 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-brand-400 cursor-pointer transition-all relative">
+                        <div class="absolute -top-2 -right-2 w-5 h-5 bg-slate-200 hover:bg-red-500 hover:text-white text-slate-500 rounded-full flex items-center justify-center text-[10px] cursor-pointer transition-colors shadow-sm"><i data-lucide="x" class="w-3 h-3"></i></div>
+                        <div class="p-3 border-b border-slate-100 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-purple-50 flex items-center justify-center text-purple-600"><i data-lucide="arrow-down-up" class="w-4 h-4"></i></div>
+                            <span class="font-medium text-sm">Ion Exchange</span>
+                        </div>
+                        <div class="p-3 bg-slate-50/50 text-xs text-slate-500 rounded-b-lg">
+                            <div class="flex justify-between mb-1"><span>Type:</span> <span class="font-medium text-slate-700">Mixed Bed</span></div>
+                            <div class="flex justify-between"><span>Regen:</span> <span class="font-medium text-slate-700">Auto</span></div>
+                        </div>
+                    </div>
+
+                    <div class="process-arrow"></div>
+
+                    <!-- Block: Product Water -->
+                    <div class="process-block flex-shrink-0 w-44 bg-white border border-slate-200 rounded-lg shadow-sm cursor-default">
+                        <div class="p-3 border-b border-slate-100 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-emerald-50 flex items-center justify-center text-emerald-600"><i data-lucide="glass-water" class="w-4 h-4"></i></div>
+                            <span class="font-medium text-sm">Product</span>
+                        </div>
+                        <div class="p-3 bg-slate-50/50 text-xs text-slate-500 rounded-b-lg">
+                            <div class="flex justify-between mb-1"><span>Flow:</span> <span class="font-medium text-emerald-600">71.2 m³/h</span></div>
+                            <div class="flex justify-between"><span>TDS:</span> <span class="font-medium text-emerald-600">< 5 mg/L</span></div>
+                        </div>
+                    </div>
+
+                    <div class="process-arrow" style="background: transparent;"></div>
+
+                    <!-- Add Block Button -->
+                    <button class="flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed border-slate-300 hover:border-brand-500 hover:bg-brand-50 text-slate-400 hover:text-brand-600 flex items-center justify-center transition-colors">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                    </button>
+                    
+                </div>
+            </div>
+
+            <!-- Dynamic Configuration Panel -->
+            <div class="flex-1 p-6 bg-white overflow-y-auto">
+                <div class="max-w-5xl mx-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="settings-2" class="w-5 h-5 text-brand-600"></i> Reverse Osmosis Configuration
+                        </h2>
+                        <div class="flex gap-2">
+                            <button class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium rounded transition-colors">Reset Defaults</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8">
+                        <!-- Left Side: Hardware/Membrane -->
+                        <div class="space-y-5 bg-slate-50 p-5 rounded-xl border border-slate-100">
+                            <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-2 border-b border-slate-200 pb-2">Hardware Selection</h3>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Membrane Element Type</label>
+                                <select class="shad-input cursor-pointer">
+                                    <option>FilmTec™ BW30-400</option>
+                                    <option>FilmTec™ BW30HR-440</option>
+                                    <option>FilmTec™ SW30HRLE-400</option>
+                                    <option>Toray TM720D-400</option>
+                                    <option>Hydranautics CPA5-LD</option>
+                                </select>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Elements per Vessel</label>
+                                    <input type="number" class="shad-input" value="6" min="1" max="8">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Total Stages</label>
+                                    <select class="shad-input cursor-pointer">
+                                        <option>1 Stage</option>
+                                        <option selected>2 Stages</option>
+                                        <option>3 Stages</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Stage 1 Pressure Vessels</label>
+                                    <input type="number" class="shad-input" value="12" min="1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Stage 2 Pressure Vessels</label>
+                                    <input type="number" class="shad-input" value="6" min="1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Side: Process Parameters -->
+                        <div class="space-y-5 bg-slate-50 p-5 rounded-xl border border-slate-100">
+                            <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-2 border-b border-slate-200 pb-2">Process Targets</h3>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1 flex justify-between">
+                                    <span>Target System Recovery (%)</span>
+                                    <span class="text-brand-600 font-bold">75.0%</span>
+                                </label>
+                                <div class="flex items-center gap-4 mt-2">
+                                    <input type="range" min="30" max="90" value="75" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+                                    <input type="number" class="shad-input w-20" value="75.0">
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4 pt-2">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Design Temperature (°C)</label>
+                                    <input type="number" class="shad-input" value="25.0" step="0.5">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Fouling Factor</label>
+                                    <input type="number" class="shad-input" value="0.85" step="0.01">
+                                </div>
+                            </div>
+
+                            <div class="pt-2">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Pump Efficiency (%)</label>
+                                <input type="number" class="shad-input w-1/2" value="80" max="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar (Water Chemistry Widget) -->
+        <aside class="w-80 bg-white border-l border-slate-200 flex flex-col shadow-[-4px_0_15px_rgba(0,0,0,0.03)] z-10 relative">
+            
+            <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <h2 class="text-sm font-bold text-slate-700 flex items-center gap-2"><i data-lucide="beaker" class="w-4 h-4 text-brand-600"></i> Water Chemistry</h2>
+                <button class="text-slate-400 hover:text-slate-600"><i data-lucide="minimize-2" class="w-4 h-4"></i></button>
+            </div>
+
+            <!-- Balance Indicator -->
+            <div class="p-4 border-b border-slate-100">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="font-medium text-slate-600">Cation/Anion Balance</span>
+                    <span class="text-emerald-600 font-bold">99.4% (Accept)</span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 w-[99.4%]"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                    <span>Target: 100%</span>
+                    <span>CBE: 0.6%</span>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <table class="w-full text-xs text-left">
+                    <thead>
+                        <tr class="text-slate-500 border-b border-slate-200">
+                            <th class="pb-2 font-semibold">Ion / Param</th>
+                            <th class="pb-2 font-semibold text-right">Feed <span class="text-[9px] font-normal block">(mg/L)</span></th>
+                            <th class="pb-2 font-semibold text-right">Product <span class="text-[9px] font-normal block">(mg/L)</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr>
+                            <td class="py-2 text-slate-700 font-medium">Sodium (Na)</td>
+                            <td class="py-2 text-right">130.0</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">2.1</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 text-slate-700 font-medium">Calcium (Ca)</td>
+                            <td class="py-2 text-right">85.0</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">0.4</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 text-slate-700 font-medium">Magnesium (Mg)</td>
+                            <td class="py-2 text-right">28.0</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">0.1</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 text-slate-700 font-medium">Potassium (K)</td>
+                            <td class="py-2 text-right">4.5</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">0.2</td>
+                        </tr>
+                        <tr class="bg-slate-50">
+                            <td class="py-2 text-slate-700 font-medium">Chloride (Cl)</td>
+                            <td class="py-2 text-right">180.0</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">3.4</td>
+                        </tr>
+                        <tr class="bg-slate-50">
+                            <td class="py-2 text-slate-700 font-medium">Sulfate (SO₄)</td>
+                            <td class="py-2 text-right">110.0</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">0.2</td>
+                        </tr>
+                        <tr class="bg-slate-50">
+                            <td class="py-2 text-slate-700 font-medium">Bicarbonate (HCO₃)</td>
+                            <td class="py-2 text-right">165.0</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">1.5</td>
+                        </tr>
+                        <tr class="bg-slate-50">
+                            <td class="py-2 text-slate-700 font-medium">Silica (SiO₂)</td>
+                            <td class="py-2 text-right">18.0</td>
+                            <td class="py-2 text-right text-brand-600 font-medium">0.3</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="border-t border-slate-300">
+                        <tr>
+                            <td class="py-3 font-bold text-slate-800">Total TDS</td>
+                            <td class="py-3 text-right font-bold text-slate-800">720.5</td>
+                            <td class="py-3 text-right font-bold text-brand-600">8.2</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1 font-bold text-slate-800">pH</td>
+                            <td class="py-1 text-right font-bold text-slate-800">7.2</td>
+                            <td class="py-1 text-right font-bold text-brand-600">5.8</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            
+            <div class="p-4 border-t border-slate-200 bg-slate-50">
+                <button class="w-full py-2 bg-white border border-slate-300 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm">View Full Ionic Report</button>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Toast Notification (Hidden by default) -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-white border border-slate-200 shadow-xl rounded-lg p-4 flex items-start gap-3 opacity-0 pointer-events-none transform translate-y-full transition-all duration-300 z-50 w-80">
+        <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+            <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+        </div>
+        <div>
+            <h4 class="text-sm font-semibold text-slate-800">Simulation Complete</h4>
+            <p class="text-xs text-slate-500 mt-1">Simulation converged successfully in 3 iterations. Design is well within limits.</p>
+        </div>
+        <button id="close-toast" class="ml-auto text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+
+    <!-- Initialize Lucide Icons -->
+    <script>
+        lucide.createIcons();
+
+        // UI Interactions
+        document.addEventListener('DOMContentLoaded', () => {
+            const runBtn = document.getElementById('run-simulation-btn');
+            const runIcon = document.getElementById('run-icon');
+            const runText = document.getElementById('run-text');
+            const toast = document.getElementById('toast');
+            const closeToast = document.getElementById('close-toast');
+            const processBlocks = document.querySelectorAll('.process-block:not(.cursor-default)'); // excluding product water
+
+            // Block Selection Logic
+            processBlocks.forEach(block => {
+                block.addEventListener('click', (e) => {
+                    // Ignore clicks on the 'X' button
+                    if (e.target.closest('.rounded-full')) return;
+
+                    // Remove active styling from all blocks
+                    processBlocks.forEach(b => {
+                        b.classList.remove('border-2', 'border-brand-500', 'shadow-md');
+                        b.classList.add('border', 'border-slate-200', 'shadow-sm');
+                    });
+                    
+                    // Add active styling to clicked block
+                    block.classList.remove('border', 'border-slate-200', 'shadow-sm');
+                    block.classList.add('border-2', 'border-brand-500', 'shadow-md');
+                });
+            });
+
+            // Run Simulation Logic
+            runBtn.addEventListener('click', () => {
+                // Set loading state
+                runBtn.disabled = true;
+                runIcon.setAttribute('data-lucide', 'loader-2');
+                runIcon.classList.add('animate-spin-slow');
+                runText.textContent = 'Solving...';
+                lucide.createIcons();
+
+                // Mock network delay (1.5 seconds)
+                setTimeout(() => {
+                    // Reset button
+                    runBtn.disabled = false;
+                    runIcon.setAttribute('data-lucide', 'play');
+                    runIcon.classList.remove('animate-spin-slow');
+                    runText.textContent = 'Run Simulation';
+                    lucide.createIcons();
+
+                    // Show Toast
+                    toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-full');
+                    toast.classList.add('toast-enter');
+
+                    // Auto hide toast after 4 seconds
+                    setTimeout(() => {
+                        hideToast();
+                    }, 4000);
+                }, 1500);
+            });
+
+            // Close Toast manually
+            closeToast.addEventListener('click', hideToast);
+
+            function hideToast() {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-full');
+            }
+        });
+    </script>
+</body>
+</html>
