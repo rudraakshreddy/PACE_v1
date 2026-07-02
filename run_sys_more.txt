@@ -1,0 +1,63 @@
+﻿s_per_vessel: safeInputVal('calc-elements-pv', 6),
+            target_recovery_pct: document.getElementById('calc-target-recovery') ? safeInputVal('calc-target-recovery', 75.0) : safeInputVal('recovery', 75.0)
+        };
+
+        const pass2 = {
+            membrane: document.getElementById('calc-p2-membrane') ? document.getElementById('calc-p2-membrane').value : 'BW30-400',
+            stages: safeInputVal('calc-p2-stages', 1),
+            vessels_per_stage: p2Vessels,
+            elements_per_vessel: safeInputVal('calc-p2-elements-pv', 6),
+            target_recovery_pct: safeInputVal('calc-p2-recovery', 85.0)
+        };
+
+        const conditioning = {
+            enabled: condEnabled,
+            target_ph: condPh,
+            chemical: condChem,
+            co2_degassing: condDegas
+        };
+
+        const recycle = {
+            enabled: recycleEnabled,
+            recycle_ratio: recycleRatio
+        };
+
+        const economicParams = {
+            electricity_tariff: safeInputVal('eco-tariff', 7.50),
+            membrane_cost: safeInputVal('eco-mem-cost', 26880.0),
+            vessel_cost: safeInputVal('eco-ves-cost', 48000.0),
+            pump_cost_kw: safeInputVal('eco-pump-cost', 96000.0),
+            ic_factor: safeInputVal('eco-ic-factor', 15) / 100.0,
+            contingency_factor: safeInputVal('eco-cont-factor', 10) / 100.0,
+            plant_availability: safeInputVal('eco-avail', 90) / 100.0,
+            membrane_lifetime: safeInputVal('eco-mem-life', 5.0),
+            discount_rate: 0.10,
+            project_life: 20.0
+        };
+
+        const payload = {
+            technology_train: document.getElementById('calc-tech-train') ? document.getElementById('calc-tech-train').value : 'RO',
+            feed_water: feedData,
+            target_flow_m3h: safeInputVal('flow', 50.0),
+            target_recovery_pct: document.getElementById('calc-target-recovery') ? safeInputVal('calc-target-recovery', 75.0) : safeInputVal('recovery', 75.0),
+            target_tds: safeInputVal('target-tds', 50.0),
+            source_type: (() => {
+                const wt = document.getElementById('water-type');
+                if (!wt) return 'LOW_TDS';
+                const selectedOpt = wt.options[wt.selectedIndex];
+                return selectedOpt ? (selectedOpt.getAttribute('data-source-type') || "LOW_TDS") : "LOW_TDS";
+            })(),
+            ro_membrane: document.getElementById('calc-ro-membrane') ? document.getElementById('calc-ro-membrane').value : 'BW30-400',
+            stages: safeInputVal('calc-stages', 2),
+            vessels_per_stage: vessels,
+            elements_per_vessel: safeInputVal('calc-elements-pv', 6),
+            recycle_enabled: recycleEnabled,
+            recycle_ratio: recycleRatio,
+            pass1: pass1,
+            pass2: pass2,
+            conditioning: conditioning,
+            recycle: recycle,
+            economic_params: economicParams
+        };
+
+        const response = await fetch(`${API_BASE}/api/calcul

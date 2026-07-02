@@ -2,28 +2,7 @@ window.isProjectDirty = false;
 
 window.showLoader = function() {
     const loader = document.getElementById('global-loader');
-    if (loader) {
-        loader.classList.add('is-active');
-        
-        // Center the loader container horizontally over the active content area
-        const activeDashboard = document.querySelector('.dashboard:not([style*="display: none"])');
-        const loaderContainer = loader.querySelector('.pace-loader');
-        if (activeDashboard && loaderContainer) {
-            const style = window.getComputedStyle(activeDashboard);
-            const gridTemplate = style.getPropertyValue('grid-template-columns');
-            if (gridTemplate && gridTemplate.includes('350px')) {
-                // Shift right by 175px to offset the 350px left sidebar
-                loaderContainer.style.transform = 'translateX(175px)';
-            } else if (gridTemplate && gridTemplate.includes('450px')) {
-                // Shift left by 225px to offset the 450px right sidebar
-                loaderContainer.style.transform = 'translateX(-225px)';
-            } else {
-                loaderContainer.style.transform = 'none';
-            }
-        } else if (loaderContainer) {
-            loaderContainer.style.transform = 'none';
-        }
-    }
+    if (loader) loader.classList.add('is-active');
 };
 
 window.hideLoader = function() {
@@ -33,102 +12,44 @@ window.hideLoader = function() {
 
 const originalFetch = window.fetch;
 window.fetch = async function(...args) {
-    const url = args[0];
-    const isCalc = url && typeof url === 'string' && (
-        url.includes('/calculate') || 
-        url.includes('/process-recommendation') || 
-        url.includes('/simulate-aging')
-    );
-
-    if (isCalc && window.showLoader) window.showLoader();
-    const startTime = Date.now();
+    window.showLoader();
     try {
-        if (url && typeof url === 'string' && url.includes('localhost:8000')) {
-            const opts = args[1] || {};
-            opts.headers = opts.headers || {};
-            
-            // Avoid overwriting if it's a Headers object
-            if (opts.headers instanceof Headers) {
-                opts.headers.set('Authorization', 'Basic dXNlcjpwYXNzd29yZDEyMw==');
-            } else {
-                opts.headers['Authorization'] = 'Basic dXNlcjpwYXNzd29yZDEyMw==';
-            }
-            args[1] = opts;
-        }
         return await originalFetch(...args);
     } finally {
-        if (isCalc) {
-            const elapsed = Date.now() - startTime;
-            if (elapsed < 1500) {
-                await new Promise(r => setTimeout(r, 1500 - elapsed));
-            }
-            if (window.hideLoader) window.hideLoader();
-        }
+        window.hideLoader();
     }
 };
 
-window.isAppUnlocked = false;
-
 window.validateProjectModal = function() {
     const pName = document.getElementById('proj-name');
-    const hasProjectName = pName && pName.value.trim() !== '';
-
-    // If project name is empty, relock the app immediately
-    if (!hasProjectName) {
-        window.isAppUnlocked = false;
-    }
-
-    if (window.isAppUnlocked && hasProjectName) {
+    if (pName && pName.value.trim() !== '') {
         document.querySelectorAll('.pace-locked-tab').forEach(btn => {
             btn.classList.remove('pace-locked-tab');
             const icon = btn.querySelector('.pace-lock-icon');
             if (icon) icon.style.display = 'none';
         });
-        const memBtn = document.getElementById('membrane-db-btn');
-        if (memBtn) {
-            memBtn.classList.remove('pace-locked-tab');
-            const icon = memBtn.querySelector('.pace-lock-icon');
-            if (icon) icon.style.display = 'none';
-        }
         window.isProjectDirty = true;
     } else {
-        // Lock all tabs other than file and project-details
         document.querySelectorAll('.menu-btn:not(#project-details-tab-btn):not(#file-tab-btn)').forEach(btn => {
             btn.classList.add('pace-locked-tab');
             const icon = btn.querySelector('.pace-lock-icon');
             if (icon) icon.style.display = 'inline-block';
         });
-        const memBtn = document.getElementById('membrane-db-btn');
-        if (memBtn) {
-            memBtn.classList.add('pace-locked-tab');
-            const icon = memBtn.querySelector('.pace-lock-icon');
-            if (icon) icon.style.display = 'inline-block';
-        }
     }
 };
 
 window.clearProjectModal = function() {
     const pName = document.getElementById('proj-name');
     const pEng = document.getElementById('proj-engineer');
-    const pId = document.getElementById('proj-id');
     if (pName) pName.value = '';
     if (pEng) pEng.value = '';
-    if (pId) {
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const rand = Math.floor(1000 + Math.random() * 9000);
-        pId.value = `PACE-${yyyy}-${mm}${dd}-${rand}`;
-    }
     window.validateProjectModal();
 };
 
 window.proceedToApp = function() {
+    window.validateProjectModal();
     const pName = document.getElementById('proj-name');
     if (pName && pName.value.trim() !== '') {
-        window.isAppUnlocked = true;
-        window.validateProjectModal();
         const feedTab = document.getElementById('feed-data-tab-btn');
         if (feedTab) feedTab.click();
     } else {
@@ -174,157 +95,9 @@ document.addEventListener('input', () => { window.isProjectDirty = true; });
 
 // Make sure to unlock on load if there's data
 window.addEventListener('load', () => {
-    const projIdInput = document.getElementById('proj-id');
-    if (projIdInput && !projIdInput.value) {
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const rand = Math.floor(1000 + Math.random() * 9000);
-        projIdInput.value = `PACE-${yyyy}-${mm}${dd}-${rand}`;
-    }
-    
-    // Load saved User Info from LocalStorage
-    const savedUserInfo = localStorage.getItem('pace_user_info');
-    if (savedUserInfo) {
-        try {
-            const data = JSON.parse(savedUserInfo);
-            if (document.getElementById('user-first-name')) document.getElementById('user-first-name').value = data.firstName || '';
-            if (document.getElementById('user-last-name')) document.getElementById('user-last-name').value = data.lastName || '';
-            if (document.getElementById('user-company')) document.getElementById('user-company').value = data.company || '';
-            if (document.getElementById('user-email')) document.getElementById('user-email').value = data.email || '';
-            if (document.getElementById('user-office')) document.getElementById('user-office').value = data.office || '';
-            if (document.getElementById('user-mobile')) document.getElementById('user-mobile').value = data.mobile || '';
-            if (document.getElementById('user-fax')) document.getElementById('user-fax').value = data.fax || '';
-            if (document.getElementById('user-street')) document.getElementById('user-street').value = data.street || '';
-            if (document.getElementById('user-city')) document.getElementById('user-city').value = data.city || '';
-            if (document.getElementById('user-country')) document.getElementById('user-country').value = data.country || '';
-            if (document.getElementById('user-ui-lang') && data.uiLang) document.getElementById('user-ui-lang').value = data.uiLang;
-            if (document.getElementById('user-report-lang') && data.reportLang) document.getElementById('user-report-lang').value = data.reportLang;
-            
-            // Update initials
-            let initials = '';
-            if (data.firstName) initials += data.firstName[0];
-            if (data.lastName) initials += data.lastName[0];
-            initials = initials.toUpperCase() || 'JD';
-            const profileBtn = document.querySelector('.user-profile');
-            if (profileBtn) profileBtn.textContent = initials;
-        } catch (e) {
-            console.error('Error parsing saved user info', e);
-        }
-    } else {
-        // Fallback: update initials from default DOM input values (e.g. Wave Tango -> WT)
-        const fNameInput = document.getElementById('user-first-name');
-        const lNameInput = document.getElementById('user-last-name');
-        const fName = fNameInput ? fNameInput.value.trim() : '';
-        const lName = lNameInput ? lNameInput.value.trim() : '';
-        let initials = '';
-        if (fName) initials += fName[0];
-        if (lName) initials += lName[0];
-        initials = initials.toUpperCase() || 'JD';
-        const profileBtn = document.querySelector('.user-profile');
-        if (profileBtn) profileBtn.textContent = initials;
-    }
-    
-    // Check if project name is pre-populated on load to auto-unlock
-    const pNameInput = document.getElementById('proj-name');
-    if (pNameInput && pNameInput.value.trim() !== '') {
-        window.isAppUnlocked = true;
-    }
-
-    // Wire up header "Run Analysis" button
-    const runAnalysisBtn = document.getElementById('run-analysis-btn');
-    if (runAnalysisBtn) {
-        runAnalysisBtn.addEventListener('click', () => {
-            const pName = document.getElementById('proj-name');
-            if (!pName || pName.value.trim() === '') {
-                alert('Please fill out the PROJECT NAME field first to proceed.');
-                const projTab = document.getElementById('project-details-tab-btn');
-                if (projTab) projTab.click();
-                if (pName) pName.focus();
-                return;
-            }
-            
-            if (!window.isAppUnlocked) {
-                alert('Please click the "SAVE & Proceed" button on the Project Details page first to unlock other modules.');
-                const projTab = document.getElementById('project-details-tab-btn');
-                if (projTab) projTab.click();
-                return;
-            }
-            
-            const feedTab = document.getElementById('feed-data-tab-btn');
-            if (feedTab) {
-                feedTab.click();
-                if (typeof calculateChemistry === 'function') calculateChemistry(true);
-                if (typeof calculatePreTreatment === 'function') calculatePreTreatment(true);
-            }
-        });
-    }
-
     setTimeout(window.validateProjectModal, 500);
-    if (typeof validatePhysicalParameters === 'function') {
-        validatePhysicalParameters();
-    }
 });
 window.roMembranes = {
-        "HPA-4040": {
-            "type": "BWRO",
-            "manufacturer": "Permionics",
-            "active_area_m2": 9.3,
-            "permeability_A": 3.39,
-            "permeability_B": 5.3e-08,
-            "feed_spacer_mil": 34,
-            "max_pressure_bar": 41.4,
-            "max_feed_flow_m3h": 4.09,
-            "min_conc_flow_m3h": 0.91,
-            "max_recovery_pct": 15.0,
-            "length_m": 1.016,
-            "diameter_m": 0.102,
-            "nominal_rejection": 0.996,
-            "min_rejection": 0.995,
-            "flags": [],
-            "max_temp_c": 45.0,
-            "ph_range": [2.0, 11.0],
-            "cip_ph_range": [1.0, 13.0],
-            "max_turbidity_ntu": 1.0,
-            "max_sdi_15": 5.0,
-            "max_chlorine_mgL": 0.1,
-            "design_flux_guidelines": {
-                "wastewater_conventional": {'sdi_max': 5, 'flux_min_lmh': 13.6, 'flux_max_lmh': 20.4},
-                "wastewater_uf_pretreated": {'sdi_max': 3, 'flux_min_lmh': 17.0, 'flux_max_lmh': 23.8},
-                "seawater_open_intake": {'sdi_max': 5, 'flux_min_lmh': 11.9, 'flux_max_lmh': 17.0},
-                "seawater_beach_well": {'sdi_max': 3, 'flux_min_lmh': 13.6, 'flux_max_lmh': 20.4},
-                "surface_water_sdi5": {'sdi_max': 5, 'flux_min_lmh': 20.4, 'flux_max_lmh': 27.2},
-                "surface_water_sdi3": {'sdi_max': 3, 'flux_min_lmh': 22.1, 'flux_max_lmh': 28.9},
-                "well_water": {'sdi_max': 3, 'flux_min_lmh': 22.1, 'flux_max_lmh': 28.9},
-                "ro_permeate": {'sdi_max': 1, 'flux_min_lmh': 35.7, 'flux_max_lmh': 51.0},
-            },
-            "saturation_limits": {
-                "LSI": 1.5,
-                "SDSI": 0.5,
-                "CaSO4_pct": 230,
-                "SrSO4_pct": 800,
-                "BaSO4_pct": 6000,
-                "SiO2_pct": 100,
-            },
-            "sigma": {
-                "Ca": 0.997,
-                "Mg": 0.997,
-                "Na": 0.988,
-                "K": 0.983,
-                "Cl": 0.988,
-                "SO4": 0.998,
-                "HCO3": 0.983,
-                "Ba": 0.998,
-                "Sr": 0.998,
-                "F": 0.975,
-                "SiO2": 0.990,
-                "B": 0.770,
-                "NO3": 0.945,
-                "PO4": 0.997,
-                "NH4": 0.890
-            },
-        },
         "HPA-RO-8040-LF-WW": {
             "type": "BWRO",
             "manufacturer": "Permionics",
@@ -970,9 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.target.value = '';
             }
             validatePhysicalParameters();
-            if (typeof calculateChemistry === 'function') {
-                calculateChemistry(false);
-            }
+            // Removed auto-calculation: calculateChemistry(false);
         });
     });
 
@@ -984,9 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.value) {
                 recoveryInput.value = e.target.value;
                 validatePhysicalParameters();
-                if (typeof calculateChemistry === 'function') {
-                    calculateChemistry(false);
-                }
+                // Removed auto-calculation: calculateChemistry(false);
             }
         });
     }
@@ -1089,12 +858,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.classList.add('active');
                 localStorage.setItem('activeTabId', id);
 
-                // Show "Run Analysis" button only on Feed Data tab
-                const runAnalysisBtn = document.getElementById('run-analysis-btn');
-                if (runAnalysisBtn) {
-                    runAnalysisBtn.style.display = (id === 'feed-data-tab-btn') ? 'block' : 'none';
-                }
-
                 // Hide all views
                 views.forEach(v => { if(v) v.style.display = 'none'; });
                 if (placeholderView) placeholderView.style.display = 'none';
@@ -1122,14 +885,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         .then(res => res.json())
                         .then(data => {
                             if(data.ro_membranes) {
-                                const permionicsMems = data.ro_membranes.filter(m => m.manufacturer && m.manufacturer.toLowerCase() === 'permionics');
-                                const roOptions = permionicsMems.map(m => `<option value="${m.id}">${m.name} (${m.type})</option>`).join('');
-                                
                                 const roSel = document.getElementById('calc-ro-membrane');
-                                if(roSel) roSel.innerHTML = roOptions;
-                                
-                                const p2Sel = document.getElementById('calc-p2-membrane');
-                                if(p2Sel) p2Sel.innerHTML = roOptions;
+                                if(roSel) roSel.innerHTML = data.ro_membranes.map(m => `<option value="${m.id}">${m.name} (${m.type})</option>`).join('');
                             }
                             if(data.uf_modules) {
                                 const ufSel = document.getElementById('calc-uf-module');
@@ -1246,8 +1003,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Initial calculation (do not show results card until user explicitly runs it)
-    calculateChemistry(false);
+    // Initial calculation (show pre-filled default calculations on first load)
+    calculateChemistry(true);
     
     // Restore active tab from localStorage to prevent resetting on page refresh
     let savedTabId = localStorage.getItem('activeTabId') || 'feed-data-tab-btn';
@@ -1396,14 +1153,14 @@ async function runPhreeqcCalculation() {
             // Filter out missing/extreme values so they don't crush the Y-axis scale
             window.siChart.data.datasets[0].data = rawData.map(val => (val <= -99.0) ? null : val);
             
-            // Dynamic coloring (vibrant red if > 0, else purple/indigo to match final_UI)
+            // Dynamic coloring (vibrant rose red if > 0, else sky blue)
             window.siChart.data.datasets[0].backgroundColor = window.siChart.data.datasets[0].data.map(val => {
                 if (val === null) return 'rgba(0,0,0,0)';
-                return val > 0 ? 'rgba(239, 68, 68, 0.85)' : 'rgba(79, 70, 229, 0.85)';
+                return val > 0 ? 'rgba(244, 63, 94, 0.85)' : 'rgba(14, 165, 233, 0.85)';
             });
             window.siChart.data.datasets[0].borderColor = window.siChart.data.datasets[0].data.map(val => {
                 if (val === null) return 'rgba(0,0,0,0)';
-                return val > 0 ? 'rgba(239, 68, 68, 1)' : 'rgba(79, 70, 229, 1)';
+                return val > 0 ? 'rgba(244, 63, 94, 1)' : 'rgba(14, 165, 233, 1)';
             });
             window.siChart.data.datasets[0].borderWidth = 2;
             window.siChart.data.datasets[0].borderRadius = 6;
@@ -1994,14 +1751,14 @@ window.renderActiveRecommendation = function() {
                 
                 <!-- Slide Container with transitions -->
                 <div class="carousel-slide-container" style="flex-grow: 1; min-width: 0; transition: transform 0.3s ease, opacity 0.3s ease; opacity: 1; height: 100%; display: flex; flex-direction: column;" id="active-candidate-slide">
-                    <div class="candidate-card ${isBest ? 'is-best' : ''}">
+                    <div class="candidate-card" style="border: 1px solid ${isBest ? 'rgba(59, 130, 246, 0.5)' : 'var(--card-border)'}; background: ${isBest ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.6))' : 'rgba(30, 41, 59, 0.2)'}; border-radius: 6px; padding: 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; flex-grow: 1; height: 100%; justify-content: space-between;">
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <div style="display: flex; align-items: center; gap: 0.8rem;">
-                                <div class="model-name" style="font-size: 1.3rem; font-weight: 800; color: #ffffff; font-family: 'Inter', sans-serif;">
+                                <div style="font-size: 1.3rem; font-weight: 800; color: #f8fafc; font-family: 'Inter', sans-serif;">
                                     ${rec.model}
-                                    ${isBest ? ' <span style="font-size:0.68rem; vertical-align:middle; background:rgba(255, 255, 255, 0.2); color:#ffffff; border:1px solid rgba(255,255,255,0.4); padding:0.1rem 0.4rem; border-radius:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-left:0.4rem;">RECOMMENDED</span>' : ''}
+                                    ${isBest ? ' <span style="font-size:0.68rem; vertical-align:middle; background:rgba(59, 130, 246, 0.2); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:0.1rem 0.4rem; border-radius:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-left:0.4rem;">RECOMMENDED</span>' : ''}
                                 </div>
-                                <div class="meta-text" style="font-size: 0.78rem; color: #bfdbfe; font-weight: 500;">
+                                <div style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 500;">
                                     ${rec.manufacturer} | ${rec.type}
                                 </div>
                             </div>
@@ -2012,35 +1769,35 @@ window.renderActiveRecommendation = function() {
                             </div>
                         </div>
                         
-                        <div class="metrics-text" style="font-size: 0.82rem; color: #bfdbfe; line-height: 1.35; border-left: 2px solid ${scoreColor}; padding-left: 0.7rem; margin: 0;">
-                            Permeate TDS: <b style="color:#ffffff;">${rec.calculated_metrics.permeate_tds} mg/L</b> | Energy: <b style="color:#ffffff;">${rec.calculated_metrics.specific_energy} kWh/m³</b><br>
+                        <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.35; border-left: 2px solid ${scoreColor}; padding-left: 0.7rem; margin: 0;">
+                            Permeate TDS: <b>${rec.calculated_metrics.permeate_tds} mg/L</b> | Energy: <b>${rec.calculated_metrics.specific_energy} kWh/m³</b><br>
                             Feed Pressure: <b>${rec.calculated_metrics.feed_pressure_bar} bar</b> | Max CP (\u03B2): <b>${rec.max_beta ? rec.max_beta.toFixed(2) : '1.00'}</b>
                         </div>
                         
                         <!-- Details Panel -->
-                        <div style="display: flex; flex-direction: column; gap: 0.7rem; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 0.7rem; margin-top: 0.3rem;">
+                        <div style="display: flex; flex-direction: column; gap: 0.7rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.7rem; margin-top: 0.3rem;">
                             <!-- DQ Banner if disqualified -->
                             ${isDQ ? `
-                            <div style="background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); color: #fee2e2; padding: 0.6rem; border-radius: 4px; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 0.6rem; border-radius: 4px; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
                                 <i class="fa-solid fa-triangle-exclamation"></i> Disqualified: ${rec.disqualification_reason}
                             </div>
                             ` : ''}
 
                             <!-- Operating Envelope Limits Checklist -->
-                            <div style="background: rgba(0,0,0,0.15); border-radius: 4px; padding: 0.4rem 0.7rem; border: 1px solid rgba(255,255,255,0.1);">
-                                <h4 class="section-title" style="margin-top:0; margin-bottom:0.4rem; font-size:0.75rem; font-weight:700; color:#bfdbfe; text-transform:uppercase; letter-spacing:0.05em;">Criteria Scores</h4>
+                            <div style="background: rgba(0,0,0,0.1); border-radius: 4px; padding: 0.4rem 0.7rem; border: 1px solid rgba(255,255,255,0.03);">
+                                <h4 style="margin-top:0; margin-bottom:0.4rem; font-size:0.75rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em;">Criteria Scores</h4>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.4rem; font-size:0.78rem;">
-                                    <span style="color:#93c5fd"><i class="fa-solid fa-droplet"></i> Rejection: ${rec.criteria_scores.rejection || 0}/30</span>
-                                    <span style="color:#93c5fd"><i class="fa-solid fa-bolt"></i> Energy: ${rec.criteria_scores.energy || 0}/30</span>
-                                    <span style="color:#93c5fd"><i class="fa-solid fa-water"></i> Hydraulic: ${rec.criteria_scores.hydraulic || 0}/20</span>
-                                    <span style="color:#93c5fd"><i class="fa-solid fa-gauge-high"></i> Envelope: ${rec.criteria_scores.envelope || 0}/20</span>
+                                    <span style="color:#60a5fa"><i class="fa-solid fa-droplet"></i> Rejection: ${rec.criteria_scores.rejection || 0}/30</span>
+                                    <span style="color:#60a5fa"><i class="fa-solid fa-bolt"></i> Energy: ${rec.criteria_scores.energy || 0}/30</span>
+                                    <span style="color:#60a5fa"><i class="fa-solid fa-water"></i> Hydraulic: ${rec.criteria_scores.hydraulic || 0}/20</span>
+                                    <span style="color:#60a5fa"><i class="fa-solid fa-gauge-high"></i> Envelope: ${rec.criteria_scores.envelope || 0}/20</span>
                                 </div>
                             </div>
 
                             <!-- Evaluation Notes -->
                             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                                <h4 class="section-title" style="margin: 0; font-size:0.75rem; font-weight:700; color:#bfdbfe; text-transform:uppercase; letter-spacing:0.05em;">Engineering Notes</h4>
-                                <ul class="notes-list" style="padding-left: 1rem; margin: 0; font-size: 0.78rem; color: #ffffff; line-height:1.45; display:flex; flex-direction:column; gap:0.15rem;">
+                                <h4 style="margin: 0; font-size:0.75rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em;">Engineering Notes</h4>
+                                <ul style="padding-left: 1rem; margin: 0; font-size: 0.78rem; color: var(--text-primary); line-height:1.45; display:flex; flex-direction:column; gap:0.15rem;">
                                     ${rec.justification && rec.justification.length > 0 ? rec.justification.map(note => `<li>${note}</li>`).join('') : '<li>No notes available.</li>'}
                                 </ul>
                             </div>
@@ -2353,7 +2110,6 @@ function calculateChemistry(showAllResults = false) {
     const osmoticPressureDisplay = conversions.pressure.fromBase(osmoticPressureBase, currentUnits.pressure); // Convert to selected display unit
 
     // Render results based on state (live entering vs calculated)
-
     if (showAllResults) {
         document.getElementById('calc-tds').textContent = calculatedTds.toFixed(1);
         document.getElementById('calc-ec').textContent = calcEc.toFixed(1);
@@ -2825,8 +2581,6 @@ function solveRegression() {
 
 // Run Year-by-Year Performance decline projections
 function runDeclineProjection() {
-    // Guard: only run if the decline projection elements exist on this page
-    if (!document.getElementById('dec-p0')) return;
     // Inputs in user-preferred display units
     const p0 = parseFloat(document.getElementById('dec-p0').value) || 12.0;
     const q0 = parseFloat(document.getElementById('dec-q0').value) || 100.0;
@@ -3371,10 +3125,6 @@ function generateReportContent() {
 document.addEventListener('DOMContentLoaded', () => {
     const ctx = document.getElementById('siChart');
     if (ctx) {
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        const tickColor = isDark ? '#94a3b8' : '#475569';
-        const labelColor = isDark ? '#f8fafc' : '#1e293b';
-
         window.siChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -3382,8 +3132,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: 'Saturation Index (log10)',
                     data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    backgroundColor: 'rgba(79, 70, 229, 0.8)',
-                    borderColor: 'rgb(79, 70, 229)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                    borderColor: 'rgb(37, 99, 235)',
                     borderWidth: 1,
                     borderRadius: 4
                 }]
@@ -3393,7 +3143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        labels: { color: labelColor, font: { family: 'Inter', size: 13 } }
+                        labels: { color: '#f8fafc', font: { family: 'Inter', size: 13 } }
                     },
                     tooltip: {
                         backgroundColor: 'rgba(15, 23, 42, 0.95)',
@@ -3411,22 +3161,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 scales: {
                     y: {
                         grid: { 
-                            color: (context) => {
-                                const activeDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                                if (context.tick.value === 0) {
-                                    return activeDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
-                                }
-                                return activeDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-                            },
+                            color: (context) => context.tick.value === 0 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.05)',
                             lineWidth: (context) => context.tick.value === 0 ? 2 : 1,
                             borderDash: (context) => context.tick.value === 0 ? [] : [5, 5]
                         },
-                        ticks: { color: tickColor, font: { family: 'Inter' } },
-                        title: { display: true, text: 'Saturation Index (log10)', color: tickColor, font: { family: 'Inter', size: 13 } }
+                        ticks: { color: '#94a3b8', font: { family: 'Inter' } },
+                        title: { display: true, text: 'Saturation Index (log10)', color: '#94a3b8', font: { family: 'Inter', size: 13 } }
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { color: tickColor, font: { family: 'Inter', size: 12 } }
+                        ticks: { color: '#94a3b8', font: { family: 'Inter', size: 12 } }
                     }
                 }
             }
@@ -3434,109 +3178,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Clear all ionic data inputs
 window.clearIonicData = function() {
     document.querySelectorAll('.ion-input').forEach(input => {
         input.value = 0;
         input.dispatchEvent(new Event('input'));
     });
-    if (typeof calculateChemistry === 'function') {
-        calculateChemistry(false);
-    }
-};
-
-window.runAutoBalance = function() {
-    const getVal = (id) => {
-        const el = document.getElementById(id);
-        if (!el) return 0;
-        return parseFloat(el.value || el.textContent) || 0;
-    };
-    
-    const ph = getVal('ph') || 7.0;
-    const calcium = getVal('ca');
-    const magnesium = getVal('mg');
-    const sodium = getVal('na');
-    const potassium = getVal('k');
-    const ammonium = getVal('nh4');
-    const barium = getVal('ba');
-    const strontium = getVal('sr');
-    const chloride = getVal('cl');
-    const sulfate = getVal('so4');
-    const bicarbonate = getVal('hco3');
-    const carbonate = getVal('co3');
-    const nitrate = getVal('no3');
-    const fluoride = getVal('f');
-    const phosphate = getVal('po4');
-
-    const mw = {
-        ca: 40.08, z_ca: 2,
-        mg: 24.31, z_mg: 2,
-        na: 22.99, z_na: 1,
-        k: 39.10, z_k: 1,
-        nh4: 18.04, z_nh4: 1,
-        ba: 137.33, z_ba: 2,
-        sr: 87.62, z_sr: 2,
-        cl: 35.45, z_cl: 1,
-        so4: 96.06, z_so4: 2,
-        hco3: 61.02, z_hco3: 1,
-        co3: 60.01, z_co3: 2,
-        no3: 62.00, z_no3: 1,
-        f: 19.00, z_f: 1,
-        po4: 94.97, z_po4: 3
-    };
-
-    const alk_meq = bicarbonate / 50.04;
-    let hco3_meq = alk_meq;
-    let co3_meq = 0.0;
-    if (ph >= 8.3) {
-        const fraction_co3 = Math.pow(10, ph - 10.3) / (1 + Math.pow(10, ph - 10.3));
-        co3_meq = alk_meq * fraction_co3;
-        hco3_meq = alk_meq - co3_meq;
-    }
-
-    const cat_meq = 
-        (calcium / mw.ca) * mw.z_ca +
-        (magnesium / mw.mg) * mw.z_mg +
-        (sodium / mw.na) * mw.z_na +
-        (potassium / mw.k) * mw.z_k +
-        (ammonium / mw.nh4) * mw.z_nh4 +
-        (barium / mw.ba) * mw.z_ba +
-        (strontium / mw.sr) * mw.z_sr;
-
-    const an_meq = 
-        (chloride / mw.cl) * mw.z_cl +
-        (sulfate / mw.so4) * mw.z_so4 +
-        hco3_meq + co3_meq +
-        (nitrate / mw.no3) * mw.z_no3 +
-        (fluoride / mw.f) * mw.z_f +
-        (phosphate / mw.po4) * mw.z_po4;
-
-    const cbe_meq = cat_meq - an_meq;
-    const denom = Math.max(cat_meq + an_meq, 0.1);
-    const cbe_pct = (cbe_meq / denom) * 100;
-
-    let na_final = sodium;
-    let cl_final = chloride;
-
-    if (Math.abs(cbe_pct) > 2.0) {
-        if (cbe_meq > 0) {
-            const injected = cbe_meq * (mw.cl / mw.z_cl);
-            cl_final += injected;
-        } else {
-            const injected = Math.abs(cbe_meq) * (mw.na / mw.z_na);
-            na_final += injected;
-        }
-    }
-
-    const naInput = document.getElementById('na');
-    const clInput = document.getElementById('cl');
-    if (naInput) {
-        naInput.value = na_final.toFixed(2);
-        naInput.dispatchEvent(new Event('input'));
-    }
-    if (clInput) {
-        clInput.value = cl_final.toFixed(2);
-        clInput.dispatchEvent(new Event('input'));
-    }
 };
 
 
@@ -3561,78 +3208,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Toggle UF module dropdown and Pass 2 container based on train selection
+    // Toggle UF module dropdown based on train selection
     const trainSelect = document.getElementById('calc-tech-train');
     if (trainSelect) {
         trainSelect.addEventListener('change', (e) => {
-            const train = e.target.value;
-
-            // ── Show / hide UF module input ─────────────────────────────────
             const ufGroup = document.getElementById('calc-uf-module-group');
-            if (ufGroup) ufGroup.style.display = train.includes('UF') ? 'block' : 'none';
-
-            // ── Show / hide Pass 2 container ────────────────────────────────
-            const pass2Container = document.getElementById('calc-pass2-container');
-            if (pass2Container) pass2Container.style.display = train.includes('2P-RO') ? 'block' : 'none';
-
-            // ── Reset inputs to sensible defaults for this train ────────────
-            const defaults = {
-                'RO':     { recovery: 75, stages: 2, vessels: '4, 2', elements: 6 },
-                'UF-RO':  { recovery: 75, stages: 2, vessels: '4, 2', elements: 6 },
-                'NF':     { recovery: 80, stages: 1, vessels: '4',    elements: 6 },
-                '2P-RO':  { recovery: 75, stages: 2, vessels: '4, 2', elements: 6 },
-            };
-            const d = defaults[train] || defaults['RO'];
-
-            const recoveryEl = document.getElementById('calc-target-recovery');
-            const stagesEl   = document.getElementById('calc-stages');
-            const vesselsEl  = document.getElementById('calc-vessels-array');
-            const elemsEl    = document.getElementById('calc-elements-pv');
-
-            if (recoveryEl) recoveryEl.value = d.recovery;
-            if (stagesEl)   stagesEl.value   = d.stages;
-            if (vesselsEl)  vesselsEl.value   = d.vessels;
-            if (elemsEl)    elemsEl.value     = d.elements;
-
-            // For 2P-RO reset Pass 2 defaults too
-            if (train.includes('2P-RO')) {
-                const p2Stages  = document.getElementById('calc-p2-stages');
-                const p2Vessels = document.getElementById('calc-p2-vessels-array');
-                const p2Elems   = document.getElementById('calc-p2-elements-pv');
-                const p2Recovery= document.getElementById('calc-p2-recovery');
-                if (p2Stages)   p2Stages.value   = 1;
-                if (p2Vessels)  p2Vessels.value   = '2';
-                if (p2Elems)    p2Elems.value     = 6;
-                if (p2Recovery) p2Recovery.value  = 85;
-            }
-
-            // ── Clear all results so user starts fresh ──────────────────────
-            const resultsContainer = document.getElementById('calc-results-container');
-            if (resultsContainer) {
-                resultsContainer.style.display = 'none';
-            }
-
-            // Clear year-wise physics table and cards safely
-            const physTbody = document.getElementById('phys-annual-tbody');
-            if (physTbody) physTbody.innerHTML = '';
-            const physBanner = document.getElementById('phys-year-banner');
-            if (physBanner) physBanner.style.display = 'none';
-            ['phys-card-press','phys-card-flow','phys-card-npf','phys-card-fri',
-             'phys-card-brel','phys-card-rec','phys-card-tds','phys-card-sec','phys-card-cips']
-            .forEach(id => { const el = document.getElementById(id); if (el) el.innerText = '-'; });
-
-            // Reset Calculate button state if it was in loading state
-            const calcBtn = document.getElementById('calculate-btn');
-            if (calcBtn) {
-                calcBtn.disabled = false;
-                calcBtn.textContent = 'Calculate';
+            if (e.target.value.includes('UF')) {
+                ufGroup.style.display = 'block';
+            } else {
+                ufGroup.style.display = 'none';
             }
         });
-        // Trigger initial toggle (without clearing results on first load)
-        const ufGroup = document.getElementById('calc-uf-module-group');
-        if (ufGroup) ufGroup.style.display = trainSelect.value.includes('UF') ? 'block' : 'none';
-        const pass2Container = document.getElementById('calc-pass2-container');
-        if (pass2Container) pass2Container.style.display = trainSelect.value.includes('2P-RO') ? 'block' : 'none';
     }
 
     // Sync vessels array when stages input changes to prevent errors
@@ -3660,35 +3246,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (stagesInput && parseInt(stagesInput.value) !== currentVessels.length) {
                     stagesInput.value = currentVessels.length;
                     stagesInput.dispatchEvent(new Event('change'));
-                }
-            }
-        });
-    }
-    // Sync Pass 2 vessels array when stages input changes to prevent errors
-    const p2StagesInput = document.getElementById('calc-p2-stages');
-    const p2VesselsInput = document.getElementById('calc-p2-vessels-array');
-    if (p2StagesInput && p2VesselsInput) {
-        p2StagesInput.addEventListener('change', () => {
-            const stages = parseInt(p2StagesInput.value) || 1;
-            const currentVessels = p2VesselsInput.value.split(',').map(s => s.trim()).filter(s => s);
-            let newVessels = [];
-            const defaultVessels = [2, 1, 1, 1];
-            for (let i = 0; i < stages; i++) {
-                if (i < currentVessels.length) {
-                    newVessels.push(currentVessels[i]);
-                } else {
-                    newVessels.push(defaultVessels[i] || 1);
-                }
-            }
-            p2VesselsInput.value = newVessels.join(', ');
-        });
-        p2VesselsInput.addEventListener('input', () => {
-            const currentVessels = p2VesselsInput.value.split(/[\s,:\-;]+/).map(s => s.trim()).filter(s => s && !isNaN(parseInt(s)));
-            if (currentVessels.length > 0 && currentVessels.length <= 4) {
-                const p2StagesInput = document.getElementById('calc-p2-stages');
-                if (p2StagesInput && parseInt(p2StagesInput.value) !== currentVessels.length) {
-                    p2StagesInput.value = currentVessels.length;
-                    p2StagesInput.dispatchEvent(new Event('change'));
                 }
             }
         });
@@ -3876,9 +3433,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const results = document.getElementById('calc-results-container');
             const runBtn = document.getElementById('calc-run-btn');
             
-            if (loading) loading.style.display = 'none'; // Ensure old loader is hidden
-            if (window.showLoader) window.showLoader();
-            
+            loading.style.display = 'block';
             if (results.style.display !== 'flex') {
                 results.style.display = 'none';
             } else {
@@ -3886,30 +3441,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             runBtn.disabled = true;
 
-            // Yield to browser to paint the loader before heavy synchronous calculation
-            await new Promise(r => setTimeout(r, 50));
-
             // Trigger local module calculations
-            try {
-                if (typeof calculateChemistry === 'function') calculateChemistry(true);
-                if (typeof calculatePreTreatment === 'function') calculatePreTreatment(true);
-                if (typeof runDeclineProjection === 'function') runDeclineProjection();
-            } catch (err) {
-                console.error("Local calculation error:", err);
-            }
+            calculateChemistry(true);
+            calculatePreTreatment(true);
+            runDeclineProjection();
 
             try {
                 // Gather feed data safely
-                const safeVal = (id, fallback = 0) => {
+                const safeVal = (id) => {
                     const el = document.getElementById(id);
-                    if (!el) return fallback;
-                    return parseFloat(el.value || el.textContent) || fallback;
-                };
-
-                const safeStr = (id, fallback = '') => {
-                    const el = document.getElementById(id);
-                    if (!el) return fallback;
-                    return el.value || el.textContent || fallback;
+                    if (!el) return 0;
+                    return parseFloat(el.value || el.textContent) || 0;
                 };
 
                 const feedData = {
@@ -3938,95 +3480,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
 
-                const vesselsStr = safeStr('calc-vessels-array', '4, 2');
+                const vesselsStr = document.getElementById('calc-vessels-array').value;
                 const vessels = vesselsStr.split(',').map(s => parseInt(s.trim()) || 1);
 
-                // Pass 1 config (corresponds to first pass inputs)
-                const pass1 = {
-                    membrane: safeStr('calc-ro-membrane', 'BW30-400'),
-                    stages: parseInt(safeVal('calc-stages', 2)),
-                    vessels_per_stage: vessels,
-                    elements_per_vessel: parseInt(safeVal('calc-elements-pv', 6)),
-                    target_recovery_pct: parseFloat(safeVal('calc-target-recovery', 75))
-                };
-
-                // Pass 2 config
-                const p2VesselsStr = safeStr('calc-p2-vessels-array', '2');
-                const p2Vessels = p2VesselsStr.split(',').map(s => parseInt(s.trim()) || 1);
-                const pass2 = {
-                    membrane: safeStr('calc-p2-membrane', 'BW30-400'),
-                    stages: parseInt(safeVal('calc-p2-stages', 1)),
-                    vessels_per_stage: p2Vessels,
-                    elements_per_vessel: parseInt(safeVal('calc-p2-elements-pv', 6)),
-                    target_recovery_pct: parseFloat(safeVal('calc-p2-recovery', 85))
-                };
-
-                // Conditioning config
-                const conditioning = {
-                    enabled: safeStr('calc-cond-enabled', 'false') === 'true',
-                    target_ph: parseFloat(safeVal('calc-cond-ph', 9.8)),
-                    chemical: safeStr('calc-cond-chem', 'NaOH'),
-                    co2_degassing: safeStr('calc-cond-degas', 'false') === 'true'
-                };
-
-                // Recycle config
-                const recycleObj = {
-                    enabled: document.getElementById('calc-recycle-enable') ? document.getElementById('calc-recycle-enable').checked : false,
-                    recycle_ratio: parseFloat(safeVal('calc-recycle-ratio', 0)) / 100.0
-                };
-
                 const payload = {
-                    technology_train: safeStr('calc-tech-train', 'RO'),
+                    technology_train: document.getElementById('calc-tech-train').value,
                     feed_water: feedData,
-                    target_flow_m3h: safeVal('flow', 100),
-                    target_recovery_pct: safeVal('calc-target-recovery', 75),
-                    ro_membrane: safeStr('calc-ro-membrane', 'BW30-400'),
-                    uf_module: safeStr('calc-tech-train', 'RO').includes('UF') ? safeStr('calc-uf-module', null) : null,
-                    stages: parseInt(safeVal('calc-stages', 2)),
+                    target_flow_m3h: parseFloat(document.getElementById('flow').value) || 100,
+                    target_recovery_pct: parseFloat(document.getElementById('calc-target-recovery').value) || 75,
+                    ro_membrane: document.getElementById('calc-ro-membrane').value,
+                    uf_module: document.getElementById('calc-tech-train').value.includes('UF') ? document.getElementById('calc-uf-module').value : null,
+                    stages: parseInt(document.getElementById('calc-stages').value) || 2,
                     vessels_per_stage: vessels,
-                    elements_per_vessel: parseInt(safeVal('calc-elements-pv', 6)),
+                    elements_per_vessel: parseInt(document.getElementById('calc-elements-pv').value) || 6,
                     recycle_enabled: document.getElementById('calc-recycle-enable') ? document.getElementById('calc-recycle-enable').checked : false,
-                    recycle_ratio: safeVal('calc-recycle-ratio', 0) / 100.0,
-                    
-                    // Sub-objects for Two-Pass RO
-                    pass1: pass1,
-                    pass2: pass2,
-                    conditioning: conditioning,
-                    recycle: recycleObj,
-                    
+                    recycle_ratio: document.getElementById('calc-recycle-ratio') ? parseFloat(document.getElementById('calc-recycle-ratio').value) / 100.0 : 0.0,
                     economic_params: {
-                        electricity_tariff: safeVal('eco-tariff', 7.50),
-                        membrane_cost: safeVal('eco-mem-cost', 26880),
-                        vessel_cost: safeVal('eco-ves-cost', 48000),
-                        pump_cost_kw: safeVal('eco-pump-cost', 96000),
-                        ic_factor: safeVal('eco-ic-factor', 15) / 100,
-                        contingency_factor: safeVal('eco-cont-factor', 10) / 100,
-                        membrane_lifetime: safeVal('eco-mem-life', 5),
-                        plant_availability: safeVal('eco-avail', 90) / 100,
+                        electricity_tariff: parseFloat(document.getElementById('eco-tariff').value) || 7.50,
+                        membrane_cost: parseFloat(document.getElementById('eco-mem-cost').value) || 26880,
+                        vessel_cost: parseFloat(document.getElementById('eco-ves-cost').value) || 48000,
+                        pump_cost_kw: parseFloat(document.getElementById('eco-pump-cost').value) || 96000,
+                        ic_factor: (parseFloat(document.getElementById('eco-ic-factor').value) || 15) / 100,
+                        contingency_factor: (parseFloat(document.getElementById('eco-cont-factor').value) || 10) / 100,
+                        membrane_lifetime: parseFloat(document.getElementById('eco-mem-life').value) || 5,
+                        plant_availability: (parseFloat(document.getElementById('eco-avail').value) || 90) / 100,
                         discount_rate: 0.10,
                         project_life: 20
                     }
                 };
 
-                const isPhysics = document.getElementById('calc-physics-enable') && document.getElementById('calc-physics-enable').checked;
-                if (isPhysics) {
-                    payload.projection_year = parseInt(safeVal('phys-selected-year', 0));
-                    payload.n_years = 5;
-                    payload.feed_quality = {
-                        sdi15: safeVal('aging-sdi', 3.0),
-                        toc_mg_l: safeVal('aging-toc', 2.0),
-                        cl2_residual_mg_l: safeVal('aging-cl2', 0.0)
-                    };
-                    payload.cip_config = {
-                        interval_months: parseInt(safeVal('phys-cip-interval', 0)),
-                        duration_h: 4.0
-                    };
-                    payload.antiscalant_dosed = safeStr('phys-antiscalant', 'true') === 'true';
-                }
-
-                const url = isPhysics ? 'http://localhost:8000/api/calculate-system-physics' : 'http://localhost:8000/api/calculate-system';
-
-                const res = await fetch(url, {
+                const res = await fetch('http://localhost:8000/api/calculate-system', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -4034,57 +3517,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
-
-                // ── 2P-RO compatibility shim ────────────────────────────────
-                // The 2P-RO backend returns pass1_results/pass2_results, but the
-                // render block expects ro_results. Alias pass1_results so that
-                // all existing render code works unchanged for the overview cards,
-                // stage tables, booster pumps, ion table and warnings.
-                if (!data.ro_results && data.pass1_results) {
-                    data.ro_results = data.pass1_results;
-                    // Build a combined summary for the top-level KPI cards
-                    const sys = data.system_summary || {};
-                    const p1s = data.pass1_results.summary;
-                    const p2s = data.pass2_results ? data.pass2_results.summary : {};
-                    data.ro_results.summary = {
-                        ...p1s,
-                        // Override with combined Two-Pass values
-                        total_recovery:     sys.overall_recovery      ?? p1s.total_recovery,
-                        perm_flow:          sys.final_permeate_flow_m3h ?? p1s.perm_flow,
-                        perm_tds:           sys.final_permeate_tds    ?? p1s.perm_tds,
-                        sec_kwh_m3:         sys.sec_kwh_m3            ?? p1s.sec_kwh_m3,
-                        feed_pressure_bar:  p1s.feed_pressure_bar,
-                    };
-                }
-
+                
                 // Store last calculation results globally
                 window.lastCalcResult = data;
-
-                const physSubtabBtn = document.getElementById('calc-subtab-physics');
-                if (physSubtabBtn) {
-                    physSubtabBtn.style.display = isPhysics ? 'block' : 'none';
-                }
-
-                if (isPhysics && data.physics_results) {
-                    window.renderPhysicsResults(data);
-                }
                 
                 // Render UF results
-                const ufResultsCard = results.querySelector('#calc-uf-results-card');
                 if (data.uf_results) {
-                    if (ufResultsCard) {
-                        ufResultsCard.style.display = 'block';
-                        const ufModules = results.querySelector('#calc-uf-modules');
-                        const ufFlux    = results.querySelector('#calc-uf-flux');
-                        const ufRec     = results.querySelector('#calc-uf-rec');
-                        const ufTmp     = results.querySelector('#calc-uf-tmp');
-                        if (ufModules) ufModules.innerText = data.uf_results.overview.total_modules;
-                        if (ufFlux)    ufFlux.innerText    = data.uf_results.operating_conditions.filtration_flux_lmh.toFixed(1);
-                        if (ufRec)     ufRec.innerText     = data.uf_results.overview.recovery_pct.toFixed(1);
-                        if (ufTmp)     ufTmp.innerText     = data.uf_results.overview.tmp_design_bar.toFixed(2);
-                    }
+                    results.querySelector('#calc-uf-results-card').style.display = 'block';
+                    results.querySelector('#calc-uf-modules').innerText = data.uf_results.overview.total_modules;
+                    results.querySelector('#calc-uf-flux').innerText = data.uf_results.operating_conditions.filtration_flux_lmh.toFixed(1);
+                    results.querySelector('#calc-uf-rec').innerText = data.uf_results.overview.recovery_pct.toFixed(1);
+                    results.querySelector('#calc-uf-tmp').innerText = data.uf_results.overview.tmp_design_bar.toFixed(2);
                 } else {
-                    if (ufResultsCard) ufResultsCard.style.display = 'none';
+                    results.querySelector('#calc-uf-results-card').style.display = 'none';
                 }
 
                 // Format INR utility function
@@ -4110,39 +3555,35 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    // Safe setter for economics fields
-                    const setEco = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-
                     // CAPEX
-                    setEco('eco-capex-mem',   formatINR(eco.capex.membranes_inr));
-                    setEco('eco-capex-ves',   formatINR(eco.capex.vessels_inr));
-                    setEco('eco-capex-hp',    formatINR(eco.capex.hp_pump_inr));
-                    setEco('eco-capex-bp',    formatINR(eco.capex.booster_pump_inr));
-                    setEco('eco-capex-sub',   formatINR(eco.capex.equip_subtotal_inr));
-                    setEco('eco-capex-ic',    formatINR(eco.capex.ic_inr));
-                    setEco('eco-capex-cont',  formatINR(eco.capex.contingency_inr));
-                    setEco('eco-capex-total', formatINR(eco.capex.total_capex_inr));
-
+                    document.getElementById('eco-capex-mem').innerText = formatINR(eco.capex.membranes_inr);
+                    document.getElementById('eco-capex-ves').innerText = formatINR(eco.capex.vessels_inr);
+                    document.getElementById('eco-capex-hp').innerText = formatINR(eco.capex.hp_pump_inr);
+                    document.getElementById('eco-capex-bp').innerText = formatINR(eco.capex.booster_pump_inr);
+                    document.getElementById('eco-capex-sub').innerText = formatINR(eco.capex.equip_subtotal_inr);
+                    document.getElementById('eco-capex-ic').innerText = formatINR(eco.capex.ic_inr);
+                    document.getElementById('eco-capex-cont').innerText = formatINR(eco.capex.contingency_inr);
+                    document.getElementById('eco-capex-total').innerText = formatINR(eco.capex.total_capex_inr);
+                    
                     // OPEX
-                    setEco('eco-opex-energy', formatINR(eco.opex.energy_cost_pa_inr));
-                    setEco('eco-opex-mem',    formatINR(eco.opex.membrane_repl_pa_inr));
-                    setEco('eco-opex-total',  formatINR(eco.opex.total_opex_pa_inr));
-
+                    document.getElementById('eco-opex-energy').innerText = formatINR(eco.opex.energy_cost_pa_inr);
+                    document.getElementById('eco-opex-mem').innerText = formatINR(eco.opex.membrane_repl_pa_inr);
+                    document.getElementById('eco-opex-total').innerText = formatINR(eco.opex.total_opex_pa_inr);
+                    
                     // Unit Cost
-                    setEco('eco-metrics-kl',       new Intl.NumberFormat('en-IN').format(eco.metrics.annual_production_kl));
-                    setEco('eco-metrics-tac',       formatINR(eco.metrics.total_annual_cost_inr));
-                    setEco('eco-metrics-cost-kl',   '₹' + eco.metrics.cost_per_kl_inr.toFixed(2));
+                    document.getElementById('eco-metrics-kl').innerText = new Intl.NumberFormat('en-IN').format(eco.metrics.annual_production_kl);
+                    document.getElementById('eco-metrics-tac').innerText = formatINR(eco.metrics.total_annual_cost_inr);
+                    document.getElementById('eco-metrics-cost-kl').innerText = '₹' + eco.metrics.cost_per_kl_inr.toFixed(2);
                 }
                 
                 // Render RO results
                 if (data.ro_results) {
                     const roSum = data.ro_results.summary;
-                    const setR = (sel, val) => { const el = results.querySelector(sel); if (el) el.innerText = val; };
-                    setR('#calc-sys-rec',       (roSum.total_recovery * 100).toFixed(1));
-                    setR('#calc-sys-perm-flow', roSum.perm_flow.toFixed(1));
-                    setR('#calc-sys-press',     roSum.feed_pressure_bar.toFixed(1));
-                    setR('#calc-sys-tds',       roSum.perm_tds.toFixed(1));
-                    setR('#calc-sys-sec',       roSum.sec_kwh_m3.toFixed(2));
+                    results.querySelector('#calc-sys-rec').innerText = (roSum.total_recovery * 100).toFixed(1);
+                    results.querySelector('#calc-sys-perm-flow').innerText = roSum.perm_flow.toFixed(1);
+                    results.querySelector('#calc-sys-press').innerText = roSum.feed_pressure_bar.toFixed(1);
+                    results.querySelector('#calc-sys-tds').innerText = roSum.perm_tds.toFixed(1);
+                    results.querySelector('#calc-sys-sec').innerText = roSum.sec_kwh_m3.toFixed(2);
                     
                     // Render Recycle Summary
                     const recycleCard = results.querySelector('#calc-recycle-summary-card');
@@ -4179,106 +3620,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (recycleCard) recycleCard.style.display = 'none';
                     }
 
-                    // Render Two-Pass Summary Panels
-                    const twoPassCard = results.querySelector('#calc-two-pass-summary-card');
-                    const singlePassCard = results.querySelector('#calc-single-pass-summary-card');
-                    const twoPassContainer = results.querySelector('#calc-two-pass-summary-container');
-                    
-                    if (data.technology_train && data.technology_train.includes('2P-RO') && data.pass2_results) {
-                        if (singlePassCard) singlePassCard.style.display = 'none';
-                        if (twoPassContainer) twoPassContainer.style.display = 'flex';
-                        if (twoPassCard) twoPassCard.style.display = 'block'; // Keep old card active if needed elsewhere
-                        
-                        const p2sum = data.pass2_results.summary;
-                        const p1sum = data.pass1_results ? data.pass1_results.summary : {};
-
-                        // Helper to safely write overview inner texts
-                        const setT = (sel, val) => { const el = results.querySelector(sel); if (el) el.innerText = val; };
-                        
-                        // Pass 1 Overview Elements
-                        setT('#calc-2p-p1-rec',          (p1sum.total_recovery * 100).toFixed(1));
-                        setT('#calc-2p-p1-flow-summary',  p1sum.perm_flow.toFixed(1));
-                        setT('#calc-2p-p1-press',        p1sum.feed_pressure_bar.toFixed(1));
-                        setT('#calc-2p-p1-tds-summary',  p1sum.perm_tds.toFixed(2));
-                        setT('#calc-2p-p1-sec',          p1sum.sec_kwh_m3.toFixed(2));
-
-                        // Pass 2 Overview Elements
-                        setT('#calc-2p-p2-rec',          (p2sum.total_recovery * 100).toFixed(1));
-                        setT('#calc-2p-p2-flow-summary',  p2sum.perm_flow.toFixed(1));
-                        setT('#calc-2p-p2-press-summary', p2sum.feed_pressure_bar.toFixed(1));
-                        setT('#calc-2p-p2-tds-summary',  p2sum.perm_tds.toFixed(2));
-                        setT('#calc-2p-p2-sec',          p2sum.sec_kwh_m3.toFixed(2));
-
-                        // Interstage Conditioning Element
-                        const elCondDesc = results.querySelector('#calc-2p-cond-desc');
-                        if (elCondDesc) {
-                            if (data.conditioning && data.conditioning.enabled) {
-                                elCondDesc.innerText = `${data.conditioning.chemical || 'Chemical'} to pH ${data.conditioning.target_ph || '9.8'}${data.conditioning.dose_mg_l ? ' (' + data.conditioning.dose_mg_l.toFixed(1) + ' mg/L)' : ''}`;
-                            } else {
-                                elCondDesc.innerText = 'Disabled';
-                            }
-                        }
-                    } else {
-                        if (singlePassCard) singlePassCard.style.display = 'block';
-                        if (twoPassContainer) twoPassContainer.style.display = 'none';
-                    }
-
-                    // Render Stage-wise & Element-wise Tables
+                    // Render Stage-wise Table
                     const tbodyStage = results.querySelector('#calc-stage-tbody');
-                    const tbodyHyd = results.querySelector('#calc-hyd-tbody');
-                    
-                    let stagesHtml = '';
-                    let hydHtml = '';
-                    
-                    const processPass = (passData, passName, passPrefix) => {
-                        if (!passData || !passData.stages) return;
-                        
-                        if (passPrefix) {
-                            stagesHtml += `<tr style="background: var(--input-bg);"><td colspan="5" style="text-align: left; padding-left: 10px; font-weight: bold; color: var(--primary-color);">${passName}</td></tr>`;
-                        }
-                        
-                        stagesHtml += passData.stages.map(s => `
-                            <tr class="stage-summary-row" data-stage="${passPrefix ? passPrefix + '-' : ''}${s.stage}" style="cursor: pointer;" onclick="toggleStageElements('${passPrefix ? passPrefix + '-' : ''}${s.stage}', this)">
-                                <td style="text-align: left; font-weight: 600; padding-left: ${passPrefix ? '20px' : '10px'};"><i class="fa-solid fa-chevron-right" id="stage-chevron-${passPrefix ? passPrefix + '-' : ''}${s.stage}" style="margin-right: 0.5rem; color: var(--primary-color); transition: transform 0.2s; transform: rotate(0deg);"></i> Stage ${s.stage}</td>
+                    if (tbodyStage && data.ro_results.stages) {
+                        tbodyStage.innerHTML = data.ro_results.stages.map(s => `
+                            <tr class="stage-summary-row" data-stage="${s.stage}" style="cursor: pointer;" onclick="toggleStageElements(${s.stage}, this)">
+                                <td style="text-align: left; font-weight: 600;"><i class="fa-solid fa-chevron-right" id="stage-chevron-${s.stage}" style="margin-right: 0.5rem; color: var(--primary-color); transition: transform 0.2s; transform: rotate(0deg);"></i> Stage ${s.stage}</td>
                                 <td>${s.feed_flow.toFixed(2)}</td>
                                 <td>${s.perm_flow.toFixed(2)}</td>
                                 <td>${s.conc_flow.toFixed(2)}</td>
                                 <td>${(s.recovery * 100).toFixed(1)}%</td>
                             </tr>
                         `).join('');
-                        
-                        if (passData.elements && passData.summary) {
-                            const vesselsPerStage = passData.summary.vessels_per_stage || [];
-                            for (let stageIdx = 0; stageIdx < vesselsPerStage.length; stageIdx++) {
-                                const stageElements = passData.elements.filter(e => e.stage === (stageIdx + 1));
-                                
-                                hydHtml += stageElements.map(e => `
-                                    <tr class="stage-row-${passPrefix ? passPrefix + '-' : ''}${e.stage}" style="display: none;">
-                                        <td>${passPrefix === 'P2' ? 'P2-' : ''}S${e.stage}-E${e.position}</td>
-                                        <td>${e.feed_flow.toFixed(2)}</td>
-                                        <td>${e.perm_flow.toFixed(3)}</td>
-                                        <td>${e.conc_flow.toFixed(2)}</td>
-                                        <td>${e.feed_pressure.toFixed(1)}</td>
-                                        <td>${e.dp.toFixed(2)}</td>
-                                        <td>${e.flux.toFixed(1)}</td>
-                                        <td>${(e.recovery * 100).toFixed(1)}</td>
-                                        <td>${e.beta.toFixed(2)}</td>
-                                    </tr>
-                                `).join('');
-                            }
-                        }
-                    };
-                    
-                    const currentTrain = document.getElementById('calc-tech-train').value;
-                    if (currentTrain.includes('2P-RO') && data.pass1_results && data.pass2_results) {
-                        processPass(data.pass1_results, "Pass 1 (Primary RO)", "P1");
-                        processPass(data.pass2_results, "Pass 2 (Secondary RO)", "P2");
-                    } else {
-                        processPass(data.ro_results, "", "");
                     }
-                    
-                    if (tbodyStage) tbodyStage.innerHTML = stagesHtml;
-                    if (tbodyHyd) tbodyHyd.innerHTML = hydHtml;
 
                     // Render Booster Pumps
                     const bpCard = results.querySelector('#calc-booster-pumps-card');
@@ -4286,8 +3640,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.ro_results.booster_pumps && data.ro_results.booster_pumps.length > 0) {
                         const requiredPumps = data.ro_results.booster_pumps.filter(bp => bp.required);
                         if (requiredPumps.length > 0) {
-                            if (bpCard) bpCard.style.display = 'block';
-                            if (tbodyBP) tbodyBP.innerHTML = requiredPumps.map(bp => `
+                            bpCard.style.display = 'block';
+                            tbodyBP.innerHTML = requiredPumps.map(bp => `
                                 <tr>
                                     <td style="text-align: left;"><i class="fa-solid fa-arrow-right" style="color: var(--primary-color); margin-right: 0.5rem;"></i>${bp.location}</td>
                                     <td>${bp.flow_m3h.toFixed(1)}</td>
@@ -4297,29 +3651,46 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </tr>
                             `).join('');
                         } else {
-                            if (bpCard) bpCard.style.display = 'none';
+                            bpCard.style.display = 'none';
                         }
                     } else {
                         if (bpCard) bpCard.style.display = 'none';
                     }
+
+                    // Render Element-wise Table
+                    const tbodyHyd = results.querySelector('#calc-hyd-tbody');
+                    const vesselsPerStage = roSum.vessels_per_stage || [];
+                    let hydHtml = '';
+                    
+                    for (let stageIdx = 0; stageIdx < vesselsPerStage.length; stageIdx++) {
+                        const stageElements = data.ro_results.elements.filter(e => e.stage === (stageIdx + 1));
+                        
+                        hydHtml += stageElements.map(e => `
+                            <tr class="stage-row-${e.stage}" style="display: none;">
+                                <td>S${e.stage}-E${e.position}</td>
+                                <td>${e.feed_flow.toFixed(2)}</td>
+                                <td>${e.perm_flow.toFixed(3)}</td>
+                                <td>${e.conc_flow.toFixed(2)}</td>
+                                <td>${e.feed_pressure.toFixed(1)}</td>
+                                <td>${e.dp.toFixed(2)}</td>
+                                <td>${e.flux.toFixed(1)}</td>
+                                <td>${(e.recovery * 100).toFixed(1)}</td>
+                                <td>${e.beta.toFixed(2)}</td>
+                            </tr>
+                        `).join('');
+                    }
+                    tbodyHyd.innerHTML = hydHtml;
                     
                     // Render Ion Rejection Table
                     const tbodyIon = results.querySelector('#calc-ion-tbody');
                     let ionsHtml = '';
-                    const ionMap = { 'Ca': 'calcium', 'Mg': 'magnesium', 'Na': 'sodium', 'K': 'potassium', 'Ba': 'barium', 'Sr': 'strontium', 'Cl': 'chloride', 'SO4': 'sulfate', 'HCO3': 'bicarbonate', 'NO3': 'nitrate', 'F': 'fluoride', 'SiO2': 'silica', 'B': 'boron', 'PO4': 'phosphate', 'NH4': 'ammonium', 'Al': 'aluminium', 'Fe': 'iron', 'Mn': 'manganese' };
+                    const ionMap = { 'Ca': 'calcium', 'Mg': 'magnesium', 'Na': 'sodium', 'K': 'potassium', 'Ba': 'barium', 'Sr': 'strontium', 'Cl': 'chloride', 'SO4': 'sulfate', 'HCO3': 'bicarbonate', 'NO3': 'nitrate', 'F': 'fluoride', 'SiO2': 'silica', 'B': 'boron', 'PO4': 'phosphate', 'NH4': 'ammonium' };
                     for (const [ion, feedC] of Object.entries(roSum.conc_ions)) { // just to get keys
                         const f = roSum.feed_tds > 0 ? (payload.feed_water[ionMap[ion]] || 0) : 0;
-                        let p = roSum.perm_ions[ion] || 0;
-                        let c = roSum.conc_ions[ion] || 0;
+                        const p = roSum.perm_ions[ion] || 0;
+                        const c = roSum.conc_ions[ion] || 0;
                         let rej = 0;
-                        if (f > 0) {
-                            rej = (1 - (p / f)) * 100;
-                        } else {
-                            // If feed is physically 0, override solver trace values to show clean 0s
-                            p = 0;
-                            c = 0;
-                            rej = 0;
-                        }
+                        if (f > 0) rej = (1 - (p / f)) * 100;
                         
                         ionsHtml += `
                             <tr>
@@ -4331,7 +3702,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </tr>
                         `;
                     }
-                    if (tbodyIon) tbodyIon.innerHTML = ionsHtml;
+                    tbodyIon.innerHTML = ionsHtml;
                     
                     // Render Warnings
                     let allWarnings = [];
@@ -4341,8 +3712,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const warnCard = results.querySelector('#calc-warnings-card');
                     const warnBody = results.querySelector('#calc-warnings-tbody');
                     if (allWarnings.length > 0) {
-                        if (warnCard) warnCard.style.display = 'flex';
-                        if (warnBody) warnBody.innerHTML = allWarnings.map(w => {
+                        warnCard.style.display = 'flex';
+                        warnBody.innerHTML = allWarnings.map(w => {
                             const st = w.status || 'WARNING';
                             const isFail = st === 'FAIL' || st === 'ERROR';
                             const color = isFail ? 'var(--error-color)' : 'var(--warning-color)';
@@ -4359,7 +3730,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             `;
                         }).join('');
                     } else {
-                        if (warnCard) warnCard.style.display = 'none';
+                        warnCard.style.display = 'none';
                     }
                 }
                 
@@ -4371,12 +3742,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const match = onclickStr.match(/switchCalcSubTab\(['"]([^'"]+)['"]/);
                     if (match) activeTab = match[1];
                 }
-                
-                // Automatically switch to physics tab if the user ran a physics projection
-                if (isPhysics) {
-                    activeTab = 'physics';
-                }
-                
                 switchCalcSubTab(activeTab);
                 
                 // Draw PFD
@@ -4435,7 +3800,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Error during calculation: " + err.message + "\nStack: " + err.stack);
                 document.getElementById('calc-results-container').innerHTML = `<div style="color:red; padding: 2rem;"><h3>Calculation Error</h3><pre>${err.stack}</pre></div>`;
                 document.getElementById('calc-results-container').style.display = 'block';
-                if (window.hideLoader) window.hideLoader();
+                loading.style.display = 'none';
                 runBtn.disabled = false;
             }
         });
@@ -4457,24 +3822,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(window.lastCalcPayload)
                 });
                 
-                if (!res.ok) {
-                    const errText = await res.text();
-                    throw new Error(`Failed to generate report: ${res.status} ${errText}`);
-                }
+                if (!res.ok) throw new Error("Failed to generate report");
                 
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                a.download = 'PACE_Calculation_Report.pdf';
+                a.download = 'PACE_Calculation_Report.docx';
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
                 
             } catch (err) {
                 console.error(err);
-                alert(err.message);
+                alert("Error downloading report: " + err.message);
             } finally {
                 reportBtn.innerHTML = btnOriginalText;
                 reportBtn.disabled = false;
@@ -4507,14 +3869,12 @@ window.switchCalcSubTab = function(tabName, event) {
     const economics = container.querySelector('#calc-content-economics');
     const pfd = container.querySelector('#calc-content-pfd');
     
-    const physics = container.querySelector('#calc-content-physics');
     if (overview) overview.style.display = 'none';
     if (membrane) membrane.style.display = 'none';
     if (hydraulic) hydraulic.style.display = 'none';
     if (ion) ion.style.display = 'none';
     if (economics) economics.style.display = 'none';
     if (pfd) pfd.style.display = 'none';
-    if (physics) physics.style.display = 'none';
     
     const menuBar = container.querySelector('.menu-bar');
     if (menuBar) {
@@ -4527,7 +3887,6 @@ window.switchCalcSubTab = function(tabName, event) {
     else if (tabName === 'hydraulic' && hydraulic) hydraulic.style.display = 'block';
     else if (tabName === 'ion' && ion) ion.style.display = 'block';
     else if (tabName === 'economics' && economics) economics.style.display = 'flex';
-    else if (tabName === 'physics' && physics) physics.style.display = 'flex';
     else if (tabName === 'pfd' && pfd) {
         pfd.style.display = 'flex';
         if (typeof window.updateLivePFD === 'function') {
@@ -4573,24 +3932,7 @@ window.toggleStageElements = function(stageNum, clickedRow) {
 window.exportPFDSVG = function() {
     const el = document.getElementById('pfd-svg');
     if (!el) return;
-    
-    const style = getComputedStyle(document.body);
-    const vars = ['--card-bg', '--input-bg', '--card-border', '--text-primary', '--text-secondary', '--input-border',
-                  '--perm-tank-bg', '--perm-tank-stroke', '--perm-tank-text',
-                  '--rej-tank-bg', '--rej-tank-stroke', '--rej-tank-text',
-                  '--feed-tank-bg', '--feed-tank-stroke', '--feed-tank-text'];
-    let cssBlock = ':root {\n';
-    vars.forEach(v => {
-        cssBlock += `  ${v}: ${style.getPropertyValue(v).trim()};\n`;
-    });
-    cssBlock += '}';
-    
-    const clone = el.cloneNode(true);
-    const styleEl = document.createElement('style');
-    styleEl.textContent = cssBlock;
-    clone.insertBefore(styleEl, clone.firstChild);
-    
-    const blob = new Blob([clone.outerHTML], {type: 'image/svg+xml'});
+    const blob = new Blob([el.outerHTML], {type: 'image/svg+xml'});
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url; a.download = 'Process_Flow_Diagram.svg'; a.click();
@@ -4654,7 +3996,7 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
     function line(x1,y1,x2,y2,stroke,sw=2.5,extra='') {
       return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" ${extra}/>`;
     }
-    function txt(x,y,t,anchor='middle',fill='var(--text-primary)',fs=9.5,fw='normal') {
+    function txt(x,y,t,anchor='middle',fill='#e2e8f0',fs=9.5,fw='normal') {
       return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="Inter, Roboto, sans-serif" font-size="${fs}" fill="${fill}" font-weight="${fw}">${t}</text>`;
     }
     function rect(x,y,w,h,rx,fill,stroke,sw=1.5) {
@@ -4662,10 +4004,10 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
     }
     
     function feedSym(cx, cy, flow) {
-      const flowTxt = flow > 0 ? txt(cx, cy-32, `${flow.toFixed(1)} m³/h`, 'middle', 'var(--accent-color)', 8.5) : '';
+      const flowTxt = flow > 0 ? txt(cx, cy-32, `${flow.toFixed(1)} m³/h`, 'middle', '#3b82f6', 8.5) : '';
       return `<g>
-        <path d="M${cx},${cy-20} L${cx-16},${cy+14} L${cx+16},${cy+14}Z" fill="var(--feed-tank-bg)" stroke="var(--feed-tank-stroke)" stroke-width="2"/>
-        ${txt(cx, cy+28, 'Feed Water', 'middle', 'var(--text-primary)', 9, 'bold')}
+        <path d="M${cx},${cy-20} L${cx-16},${cy+14} L${cx+16},${cy+14}Z" fill="#1e3a8a" stroke="#3b82f6" stroke-width="2"/>
+        ${txt(cx, cy+28, 'Feed Water', 'middle', '#f8fafc', 9, 'bold')}
         ${flowTxt}
       </g>`;
     }
@@ -4674,24 +4016,24 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
       const [w, h] = [N.FW, N.FH];
       let ls = '';
       [0.25, 0.50, 0.75].forEach(f => {
-        ls += `<line x1="${cx-w/2+4}" y1="${cy-h/2+h*f}" x2="${cx+w/2-4}" y2="${cy-h/2+h*f}" stroke="var(--text-secondary)" stroke-width="1.6"/>`;
+        ls += `<line x1="${cx-w/2+4}" y1="${cy-h/2+h*f}" x2="${cx+w/2-4}" y2="${cy-h/2+h*f}" stroke="#94a3b8" stroke-width="1.6"/>`;
       });
       return `<g>
-        ${rect(cx-w/2, cy-h/2, w, h, 3, 'var(--input-bg)', 'var(--text-secondary)')}
-        <ellipse cx="${cx}" cy="${cy-h/2}" rx="${w/2}" ry="4.5" fill="var(--card-bg)" stroke="var(--text-secondary)" stroke-width="1.5"/>
+        ${rect(cx-w/2, cy-h/2, w, h, 3, '#1e293b', '#94a3b8')}
+        <ellipse cx="${cx}" cy="${cy-h/2}" rx="${w/2}" ry="4.5" fill="#0f172a" stroke="#94a3b8" stroke-width="1.5"/>
         ${ls}
-        ${txt(cx, cy+h/2+16, lbl, 'middle', 'var(--text-secondary)', 8.5)}
+        ${txt(cx, cy+h/2+16, lbl, 'middle', '#cbd5e1', 8.5)}
       </g>`;
     }
     
     function pumpSym(cx, cy, lbl, tag, press) {
       const r = N.PR;
-      const pressTxt = press > 0 ? txt(cx, cy-r-10, `${press.toFixed(1)} bar`, 'middle', 'var(--accent-color)', 8.5, 'bold') : '';
+      const pressTxt = press > 0 ? txt(cx, cy-r-10, `${press.toFixed(1)} bar`, 'middle', '#3b82f6', 8.5, 'bold') : '';
       return `<g>
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--input-bg)" stroke="var(--accent-color)" stroke-width="2.5"/>
-        <polygon points="${cx-r*0.55},${cy-r*0.55} ${cx-r*0.55},${cy+r*0.55} ${cx+r*0.75},${cy}" fill="var(--accent-color)"/>
-        ${txt(cx, cy+r+16, lbl, 'middle', 'var(--text-primary)', 9, 'bold')}
-        ${txt(cx, cy+r+28, tag, 'middle', 'var(--text-secondary)', 8)}
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#1e293b" stroke="#3b82f6" stroke-width="2.5"/>
+        <polygon points="${cx-r*0.55},${cy-r*0.55} ${cx-r*0.55},${cy+r*0.55} ${cx+r*0.75},${cy}" fill="#3b82f6"/>
+        ${txt(cx, cy+r+16, lbl, 'middle', '#f8fafc', 9, 'bold')}
+        ${txt(cx, cy+r+28, tag, 'middle', '#94a3b8', 8)}
         ${pressTxt}
       </g>`;
     }
@@ -4699,7 +4041,7 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
     function boosterSym(cx, cy, boost_dp) {
         const r = 18;
         return `<g>
-            <circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--input-bg)" stroke="#f59e0b" stroke-width="2.5"/>
+            <circle cx="${cx}" cy="${cy}" r="${r}" fill="#1e293b" stroke="#f59e0b" stroke-width="2.5"/>
             <polygon points="${cx-r*0.55},${cy-r*0.55} ${cx-r*0.55},${cy+r*0.55} ${cx+r*0.75},${cy}" fill="#f59e0b"/>
             ${txt(cx, cy+r+16, 'Booster Pump', 'middle', '#f1f5f9', 8.5, 'bold')}
             ${txt(cx, cy-r-10, `+${boost_dp.toFixed(1)} bar`, 'middle', '#d97706', 8.5, 'bold')}
@@ -4710,20 +4052,20 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
       const ew = (N.VW - 18) / ne;
       let divs = '';
       for (let i = 0; i < ne - 1; i++) {
-        divs += `<line x1="${x+9+ew*(i+1)}" y1="${y+4}" x2="${x+9+ew*(i+1)}" y2="${y+N.VH-4}" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="2,2"/>`;
+        divs += `<line x1="${x+9+ew*(i+1)}" y1="${y+4}" x2="${x+9+ew*(i+1)}" y2="${y+N.VH-4}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2,2"/>`;
       }
       return `<g style="cursor: pointer;">
         <title>${tooltipText}</title>
-        ${rect(x, y, N.VW, N.VH, N.VH/2, 'var(--input-bg)', 'var(--input-border)')}
+        ${rect(x, y, N.VW, N.VH, N.VH/2, '#1e293b', '#475569')}
         ${divs}
         <rect x="${x-5}" y="${y+N.VH/2-3.5}" width="5" height="7" fill="#64748b" rx="1"/>
         <rect x="${x+N.VW}" y="${y+N.VH/2-3.5}" width="5" height="7" fill="#64748b" rx="1"/>
         <circle cx="${x+N.VW/2}" cy="${y+N.VH}" r="3.5" fill="#10b981"/>
-        ${txt(x+N.VW/2, y+N.VH/2+4, `Stage ${si+1} - ${vi+1}`, 'middle', 'var(--text-secondary)', 8.5)}
+        ${txt(x+N.VW/2, y+N.VH/2+4, `Stage ${si+1} - ${vi+1}`, 'middle', '#cbd5e1', 8.5)}
       </g>`;
     }
     
-    function tankSym(cx, cy, lbl, fill='var(--perm-tank-bg)', stroke='var(--perm-tank-stroke)', textFill='var(--perm-tank-text)') {
+    function tankSym(cx, cy, lbl, fill='#064e3b', stroke='#10b981', textFill='#34d399') {
       return `<g>
         ${rect(cx-24, cy-30, 48, 60, 3, fill, stroke)}
         <ellipse cx="${cx}" cy="${cy-30}" rx="24" ry="6" fill="${fill}" stroke="${stroke}" stroke-width="1.6"/>
@@ -4757,54 +4099,25 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
     const p1Rx  = lastP1.chX + N.HW;
     const permY = p1CY + stH(maxV1) / 2 + 70;
 
-    // Determine Pass 2 stage details
-    let p2 = [];
-    let p2Rx = p1Rx;
-    const pass2_stages_data = (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.stages) 
-        ? window.lastCalcResult.pass2_results.stages 
-        : [];
-    // hasPass2: true when last result was a 2P-RO calculation
-    const hasPass2 = !!(window.lastCalcResult && window.lastCalcResult.pass2_results);
-
-    if (hasPass2) {
-        const sx1 = p1Rx + 190; // Start X for Pass 2 (leaves space for tank & pump)
-        const maxV2 = Math.max(...p2Arr);
-        let cur2 = sx1;
-        p2 = p2Arr.map((nv, si) => {
-            const stX = cur2, topY = p1CY - stH(nv) / 2;
-            const vs = Array.from({length: nv}, (_, vi) => ({x: stX + N.HW, y: topY + vi*(N.VH + N.VGY)}));
-            cur2 = stX + N.HW + N.VW + N.HW + N.SGX;
-            return {si, nv, stX, topY, vs, fhX: stX, chX: stX + N.HW + N.VW};
-        });
-        p2Rx = p2[p2.length - 1].chX + N.HW;
-    }
-
-    const rEdge = Math.max(1000, (hasPass2 ? p2Rx : p1Rx) + 200);
+    const rEdge = Math.max(1000, p1Rx + 200);
     const bEdge = permY + 110;
 
     let s = '';
     
     // Background
-    s += `<rect width="100%" height="100%" fill="var(--card-bg)"/>`;
+    s += `<rect width="100%" height="100%" fill="#0f172a"/>`;
 
     // Header Area
-    s += `<rect x="0" y="0" width="${rEdge}" height="60" fill="var(--input-bg)"/>`;
-    s += `<line x1="0" y1="60" x2="${rEdge}" y2="60" stroke="var(--card-border)" stroke-width="1.5"/>`;
-    const trainInput = document.getElementById('calc-tech-train');
-    const trainName = trainInput ? trainInput.options[trainInput.selectedIndex].text : 'RO';
-    s += txt(20, 26, `System Process Flow Diagram (${trainName})`, 'start', 'var(--text-primary)', 14, 'bold');
-    
-    let subTitle = `Pass 1 Array | ${p1Arr.join(':')} configuration | ${nEl} Elements/Vessel`;
-    if (trainName.includes('UF')) {
-        subTitle = `UF + ` + subTitle;
-    }
-    s += txt(20, 46, subTitle, 'start', 'var(--text-secondary)', 10);
+    s += `<rect x="0" y="0" width="${rEdge}" height="60" fill="#1e293b"/>`;
+    s += `<line x1="0" y1="60" x2="${rEdge}" y2="60" stroke="#334155" stroke-width="1.5"/>`;
+    s += txt(20, 26, 'System Process Flow Diagram', 'start', '#f8fafc', 14, 'bold');
+    s += txt(20, 46, `Single-Pass RO Array | ${p1Arr.join(':')} configuration | ${nEl} Elements per Vessel`, 'start', '#94a3b8', 10);
 
     // Pre-treatment lines
-    s += line(feedX+16, p1CY, acfX-N.FW/2, p1CY, 'var(--accent-color)', 2.5);
-    s += line(acfX+N.FW/2, p1CY, mcfX-N.FW/2, p1CY, 'var(--accent-color)', 2.5);
-    s += line(mcfX+N.FW/2, p1CY, hpX-N.PR, p1CY, 'var(--accent-color)', 2.5);
-    s += line(hpX+N.PR, p1CY, p1[0].fhX, p1CY, 'var(--accent-color)', 2.5);
+    s += line(feedX+16, p1CY, acfX-N.FW/2, p1CY, '#3b82f6', 2.5);
+    s += line(acfX+N.FW/2, p1CY, mcfX-N.FW/2, p1CY, '#3b82f6', 2.5);
+    s += line(mcfX+N.FW/2, p1CY, hpX-N.PR, p1CY, '#3b82f6', 2.5);
+    s += line(hpX+N.PR, p1CY, p1[0].fhX, p1CY, '#3b82f6', 2.5);
 
     // Symbols
     s += feedSym(feedX, p1CY, displayFeedFlow);
@@ -4821,10 +4134,10 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
         const stageData = stages_data.find(sd => sd.stage === si+1);
 
         // Stage Header & Metrics
-        s += stageBadge(cx, topY, 'Pass 1 - Stage ' + (si+1), 'var(--card-border)', 'var(--text-primary)');
+        s += stageBadge(cx, topY, 'Stage ' + (si+1), '#334155', '#f8fafc', stageData);
 
         // Vertical Manifolds
-        s += `<line x1="${fhX+N.HW/2}" y1="${topY-4}" x2="${fhX+N.HW/2}" y2="${topY+sH+4}" stroke="var(--accent-color)" stroke-width="6" stroke-linecap="round"/>`; // Feed manifold
+        s += `<line x1="${fhX+N.HW/2}" y1="${topY-4}" x2="${fhX+N.HW/2}" y2="${topY+sH+4}" stroke="#3b82f6" stroke-width="6" stroke-linecap="round"/>`; // Feed manifold
         s += `<line x1="${chX+N.HW/2}" y1="${topY-4}" x2="${chX+N.HW/2}" y2="${topY+sH+4}" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>`; // Conc manifold
 
         // Vessels
@@ -4850,7 +4163,7 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
                 // Draw Booster
                 const midX = (fromX + toX) / 2;
                 s += line(fromX, p1CY, midX-18, p1CY, '#ef4444', 2.5); // Red going in
-                s += line(midX+18, p1CY, toX, p1CY, 'var(--accent-color)', 2.5);   // Blue going out (boosted)
+                s += line(midX+18, p1CY, toX, p1CY, '#3b82f6', 2.5);   // Blue going out (boosted)
                 s += boosterSym(midX, p1CY, bst.boost_dp_bar);
             } else {
                 // No Booster
@@ -4860,129 +4173,25 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
         }
     });
 
-    // Permeate Collection & Pass 2 transition
+    // Permeate Collection
     const p1PermLx = p1[0].vs[0].x + N.VW/2;
     const p1PermRx = p1[p1.length-1].vs[0].x + N.VW/2;
+    s += line(p1PermLx, permY, p1PermRx+56, permY, '#10b981', 3.5);
+    // Draw proper arrow pointing to the Permeate Tank (left boundary is at p1PermRx+90-24 = p1PermRx+66)
+    s += `<polygon points="${p1PermRx+56},${permY-6} ${p1PermRx+56},${permY+6} ${p1PermRx+66},${permY}" fill="#10b981"/>`;
     
-    if (hasPass2) {
-        // Draw Pass 1 Permeate to Interstage Tank
-        s += line(p1PermLx, permY, p1Rx+36, permY, '#10b981', 3.5);
-        s += `<polygon points="${p1Rx+36},${permY-6} ${p1Rx+36},${permY+6} ${p1Rx+46},${permY}" fill="#10b981"/>`;
-        
-        let p1PermFlow = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass1_results && window.lastCalcResult.pass1_results.summary) {
-            p1PermFlow = window.lastCalcResult.pass1_results.summary.perm_flow;
-        }
-        
-        s += txt(p1PermRx+25, permY+16, 'Pass 1 Permeate', 'middle', '#10b981', 9.5, 'bold');
-        if (p1PermFlow > 0) {
-            s += txt(p1PermRx+25, permY+28, `${p1PermFlow.toFixed(1)} m³/h`, 'middle', '#10b981', 9.5, 'bold');
-        }
-        
-        // Interstage Tank
-        s += tankSym(p1Rx+70, permY, 'Interstage Tank', 'var(--perm-tank-bg)', 'var(--perm-tank-stroke)', 'var(--perm-tank-text)');
-        
-        const condEnabled = document.getElementById('calc-cond-enabled') ? document.getElementById('calc-cond-enabled').value === 'true' : false;
-        if (condEnabled) {
-            s += txt(p1Rx+70, permY+44, 'pH Adj.', 'middle', '#ea580c', 8.5, 'bold');
-        }
-        
-        // Line from Interstage Tank to Pass 2 HP Pump
-        s += line(p1Rx+70, permY-36, p1Rx+70, p1CY, '#10b981', 2.5);
-        s += line(p1Rx+70, p1CY, p1Rx+116, p1CY, '#10b981', 2.5);
-        
-        // Pass 2 HP Pump
-        let p2FeedPress = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.summary) {
-            p2FeedPress = window.lastCalcResult.pass2_results.summary.feed_pressure_bar;
-        }
-        s += pumpSym(p1Rx+130, p1CY, 'HP Pump 2', 'Pass 2 HP', p2FeedPress);
-        s += line(p1Rx+130+N.PR, p1CY, p2[0].fhX, p1CY, '#10b981', 2.5);
-        
-        // Draw Pass 2 Stages
-        p2.forEach((st, si) => {
-            const {nv, topY, vs, fhX, chX} = st;
-            const sH = stH(nv);
-            const cx = fhX + N.HW + N.VW/2;
-            
-            const stageData = pass2_stages_data.find(sd => sd.stage === si+1);
-
-            // Stage Header & Metrics
-            s += stageBadge(cx, topY, 'Pass 2 - Stage ' + (si+1), 'var(--card-border)', 'var(--text-primary)');
-
-            // Vertical Manifolds
-            s += `<line x1="${fhX+N.HW/2}" y1="${topY-4}" x2="${fhX+N.HW/2}" y2="${topY+sH+4}" stroke="#10b981" stroke-width="6" stroke-linecap="round"/>`; // Feed manifold (Pass 1 permeate)
-            s += `<line x1="${chX+N.HW/2}" y1="${topY-4}" x2="${chX+N.HW/2}" y2="${topY+sH+4}" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>`; // Conc manifold
-
-            // Vessels
-            vs.forEach((v, vi) => {
-                let tt = `Pass 2 Stage ${si+1} - Vessel ${vi+1}`;
-                if (stageData) {
-                    tt += `\nAvg Feed: ${(stageData.feed_flow / nv).toFixed(2)} m³/h`;
-                    tt += `\nAvg Perm: ${(stageData.perm_flow / nv).toFixed(2)} m³/h`;
-                    tt += `\nStage Recovery: ${(stageData.recovery * 100).toFixed(1)}%`;
-                }
-                s += vesselSym(v.x, v.y, p2NEl, si + p1.length, vi, tt);
-                s += line(v.x+N.VW/2, v.y+N.VH+4, v.x+N.VW/2, permY, '#10b981', 1.8, 'stroke-dasharray="5,3"');
-            });
-
-            // Interstage connection for Pass 2 (if multiple stages exist in Pass 2)
-            const next = p2[si+1];
-            if (next) {
-                const fromX = chX + N.HW;
-                const toX = next.fhX;
-                s += line(fromX, p1CY, toX, p1CY, '#ef4444', 2.5);
-                s += txt((fromX+toX)/2, p1CY-8, 'Concentrate', 'middle', '#ef4444', 8, 'italic');
-            }
-        });
-
-        // Pass 2 Permeate collection
-        const p2PermLx = p2[0].vs[0].x + N.VW/2;
-        const p2PermRx = p2[p2.length-1].vs[0].x + N.VW/2;
-        s += line(p2PermLx, permY, p2PermRx+56, permY, '#10b981', 3.5);
-        s += `<polygon points="${p2PermRx+56},${permY-6} ${p2PermRx+56},${permY+6} ${p2PermRx+66},${permY}" fill="#10b981"/>`;
-        
-        let p2PermFlow = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.summary) {
-            p2PermFlow = window.lastCalcResult.pass2_results.summary.perm_flow;
-        }
-        
-        s += txt(p2PermRx+25, permY+16, 'Final Permeate', 'middle', '#10b981', 9.5, 'bold');
-        if (p2PermFlow > 0) {
-            s += txt(p2PermRx+25, permY+28, `${p2PermFlow.toFixed(1)} m³/h`, 'middle', '#10b981', 9.5, 'bold');
-        }
-        
-        s += tankSym(p2PermRx+90, permY, 'Permeate Tank', 'var(--perm-tank-bg)', 'var(--perm-tank-stroke)', 'var(--perm-tank-text)');
-
-        // Pass 2 Reject collection
-        s += line(p2Rx, p1CY, p2Rx+56, p1CY, '#ef4444', 3.5);
-        s += `<polygon points="${p2Rx+56},${p1CY-6} ${p2Rx+56},${p1CY+6} ${p2Rx+66},${p1CY}" fill="#ef4444"/>`;
-        s += txt(p2Rx+25, p1CY+16, 'Pass 2 Reject', 'middle', '#ef4444', 9.5, 'bold');
-        
-        let p2ConcFlow = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.summary) {
-            p2ConcFlow = window.lastCalcResult.pass2_results.summary.conc_flow;
-        }
-        if (p2ConcFlow > 0) {
-            s += txt(p2Rx+25, p1CY+28, `${p2ConcFlow.toFixed(1)} m³/h`, 'middle', '#ef4444', 9.5, 'bold');
-        }
-        s += tankSym(p2Rx+90, p1CY, 'Pass 2 Reject', 'var(--rej-tank-bg)', 'var(--rej-tank-stroke)', 'var(--rej-tank-text)');
-
-    } else {
-        // Standard Single-Pass Permeate Collection
-        s += line(p1PermLx, permY, p1PermRx+56, permY, '#10b981', 3.5);
-        s += `<polygon points="${p1PermRx+56},${permY-6} ${p1PermRx+56},${permY+6} ${p1PermRx+66},${permY}" fill="#10b981"/>`;
-        
-        if (ro_results && ro_results.summary) {
-            s += txt(p1PermRx+25, permY+16, 'Permeate Stream', 'middle', '#10b981', 9.5, 'bold');
-            s += txt(p1PermRx+25, permY+28, `${ro_results.summary.perm_flow.toFixed(1)} m³/h`, 'middle', '#10b981', 9.5, 'bold');
-        }
-        s += tankSym(p1PermRx+90, permY, 'Permeate Tank', 'var(--perm-tank-bg)', 'var(--perm-tank-stroke)', 'var(--perm-tank-text)');
+    // Total Permeate Text (placed below the horizontal line to avoid overlapping with vertical dashed lines)
+    if (ro_results && ro_results.summary) {
+        s += txt(p1PermRx+25, permY+16, 'Permeate Stream', 'middle', '#10b981', 9.5, 'bold');
+        s += txt(p1PermRx+25, permY+28, `${ro_results.summary.perm_flow.toFixed(1)} m³/h`, 'middle', '#10b981', 9.5, 'bold');
     }
 
-    // Pass 1 Reject (always present, but if recycle is enabled, it has recycle loop)
+    s += tankSym(p1PermRx+90, permY, 'Permeate Tank');
+
+    // Final Concentrate
     const cX = p1Rx;
     s += line(cX, p1CY, cX+96, p1CY, '#ef4444', 3.5);
+    // Draw proper arrow pointing to the Reject Tank (left boundary is at cX+130-24 = cX+106)
     s += `<polygon points="${cX+96},${p1CY-6} ${cX+96},${p1CY+6} ${cX+106},${p1CY}" fill="#ef4444"/>`;
     
     const lastStage = stages_data.length > 0 ? stages_data[stages_data.length-1] : null;
@@ -4992,7 +4201,7 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
     }
     
     const rejectTextX = recycleEnabled ? (cX + 75) : (cX + 48);
-    s += txt(rejectTextX, p1CY+16, hasPass2 ? 'Pass 1 Reject' : 'Reject Stream', 'middle', '#ef4444', 9.5, 'bold');
+    s += txt(rejectTextX, p1CY+16, 'Reject Stream', 'middle', '#ef4444', 9.5, 'bold');
     if (netRejectFlow > 0) {
         s += txt(rejectTextX, p1CY+28, `${netRejectFlow.toFixed(1)} m³/h`, 'middle', '#ef4444', 9.5, 'bold');
     }
@@ -5001,7 +4210,7 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
         s += `<circle cx="${cX+45}" cy="${p1CY}" r="4.5" fill="#ef4444"/>`;
     }
 
-    s += tankSym(cX+130, p1CY, hasPass2 ? 'Pass 1 Reject' : 'Reject Tank', 'var(--rej-tank-bg)', 'var(--rej-tank-stroke)', 'var(--rej-tank-text)');
+    s += tankSym(cX+130, p1CY, 'Reject Tank', '#7f1d1d', '#ef4444', '#fca5a5');
 
     // Concentrate Recycle Loop drawing
     if (recycleEnabled) {
@@ -5021,7 +4230,7 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
         // 5. Labels on the recycle line
         const midX = (jX + rX) / 2;
         s += txt(midX, 88, 'Concentrate Recycle', 'middle', '#f59e0b', 9, 'bold');
-        s += txt(midX, 108, flowText, 'middle', 'var(--text-secondary)', 8.5, 'bold');
+        s += txt(midX, 108, flowText, 'middle', '#cbd5e1', 8.5, 'bold');
         
         // 6. Draw Blended Feed flow rate after junction
         const blendFlow = (window.lastCalcResult && window.lastCalcResult.recycle && window.lastCalcResult.recycle.enabled) 
@@ -5030,7 +4239,7 @@ window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
         
         if (blendFlow > 0) {
             s += txt((hpX + N.PR + p1[0].fhX) / 2, p1CY - 8, `${blendFlow.toFixed(1)} m³/h`, 'middle', '#3b82f6', 8.5, 'bold');
-            s += txt((hpX + N.PR + p1[0].fhX) / 2, p1CY + 14, 'Blended Feed', 'middle', 'var(--text-secondary)', 8, 'italic');
+            s += txt((hpX + N.PR + p1[0].fhX) / 2, p1CY + 14, 'Blended Feed', 'middle', '#cbd5e1', 8, 'italic');
         }
     }
 
@@ -5147,1003 +4356,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sdiFeed) sdiFeed.addEventListener('input', window.syncFeedToAging);
     if (tocFeed) tocFeed.addEventListener('input', window.syncFeedToAging);
     if (tempFeed) tempFeed.addEventListener('input', window.syncFeedToAging);
-
-    // Theme Toggle Logic
-    const themeToggleBtn = document.getElementById('theme-toggle-btn');
-    if (themeToggleBtn) {
-        const savedTheme = localStorage.getItem('pace-theme') || 'light';
-        if (savedTheme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            themeToggleBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-        }
-
-        themeToggleBtn.addEventListener('click', () => {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            if (currentTheme === 'dark') {
-                document.documentElement.removeAttribute('data-theme');
-                localStorage.setItem('pace-theme', 'light');
-                themeToggleBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
-            } else {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                localStorage.setItem('pace-theme', 'dark');
-                themeToggleBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
-            }
-
-            // Redraw siChart with correct colors for light/dark theme
-            if (window.siChart) {
-                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                const tickColor = isDark ? '#94a3b8' : '#475569';
-                const labelColor = isDark ? '#f8fafc' : '#1e293b';
-
-                window.siChart.options.plugins.legend.labels.color = labelColor;
-                window.siChart.options.scales.y.ticks.color = tickColor;
-                window.siChart.options.scales.y.title.color = tickColor;
-                window.siChart.options.scales.x.ticks.color = tickColor;
-                window.siChart.update();
-            }
-        });
-    }
 });
-
-
-/* ==========================================================================
-   Membrane Physics Aging & Projection Event Handlers
-   ========================================================================== */
-
-window.togglePhysicsPanel = function() {
-    const enabled = document.getElementById('calc-physics-enable').checked;
-    const options = document.getElementById('calc-physics-options');
-    if (options) {
-        options.style.display = enabled ? 'block' : 'none';
-    }
-};
-
-window.selectPhysicsYear = async function(year) {
-    const hiddenInput = document.getElementById('phys-selected-year');
-    if (hiddenInput) {
-        hiddenInput.value = year;
-    }
-    
-    // Highlight the button pill instantly in the UI for feedback
-    const pills = document.querySelectorAll('.physics-year-pill');
-    pills.forEach((p, idx) => {
-        if (idx === year) {
-            p.style.background = '#6366f1';
-            p.style.color = 'white';
-        } else {
-            p.style.background = 'transparent';
-            p.style.color = '#6366f1';
-        }
-    });
-
-    // Trigger detailed calculation for the selected year
-    const calcRunBtn = document.getElementById('calc-run-btn');
-    if (calcRunBtn) {
-        calcRunBtn.click();
-    }
-};
-
-window.physNpfChartInstance = null;
-window.physFoulingChartInstance = null;
-
-window.renderPhysicsResults = function(data) {
-    if (!data || !data.physics_results) return;
-    
-    const results = data.physics_results;
-    const snapshots = results.annual_snapshots || [];
-    const selectedYear = data.physics_selected_year || 0;
-    
-    // 1. Update pills classes
-    const pills = document.querySelectorAll('.physics-year-pill');
-    pills.forEach((p, idx) => {
-        if (idx === selectedYear) {
-            p.classList.add('active');
-            p.style.background = '#6366f1';
-            p.style.color = 'white';
-        } else {
-            p.classList.remove('active');
-            p.style.background = 'transparent';
-            p.style.color = '#6366f1';
-        }
-    });
-    
-    // 2. Update Banner and Header Label
-    const bannerTitle = document.getElementById('phys-banner-title');
-    if (bannerTitle) {
-        bannerTitle.innerText = selectedYear === 0 ? "Year 0 – Baseline" : `Year ${selectedYear} – Projected`;
-    }
-    const cardYearLabel = document.getElementById('phys-card-year-label');
-    if (cardYearLabel) {
-        cardYearLabel.innerText = selectedYear === 0 ? "Year 0 (Baseline)" : `Year ${selectedYear}`;
-    }
-    
-    // 3. Populate Comparison / Telemetry Cards
-    const cur = snapshots.find(s => s.year === selectedYear) || snapshots[0];
-    const base = snapshots[0];
-    
-    if (cur && base) {
-        // Helper: safely set innerText only if element exists
-        const setText = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-
-        // Feed Pressure
-        setText('phys-card-press', cur.feed_pressure_bar.toFixed(1));
-        const pressDelta = document.getElementById('phys-card-press-delta');
-        if (pressDelta) {
-            if (selectedYear === 0) {
-                pressDelta.innerText = "Baseline";
-                pressDelta.style.color = "var(--text-secondary)";
-            } else {
-                const pct = ((cur.feed_pressure_bar - base.feed_pressure_bar) / base.feed_pressure_bar) * 100;
-                pressDelta.innerText = `+${pct.toFixed(1)}% vs base`;
-                pressDelta.style.color = "#f87171";
-            }
-        }
-
-        // Permeate Flow
-        setText('phys-card-flow', cur.perm_flow.toFixed(1));
-        const flowDelta = document.getElementById('phys-card-flow-delta');
-        if (flowDelta) {
-            if (selectedYear === 0) {
-                flowDelta.innerText = "Baseline";
-                flowDelta.style.color = "var(--text-secondary)";
-            } else {
-                const pct = ((cur.perm_flow - base.perm_flow) / base.perm_flow) * 100;
-                const sign = pct >= 0 ? '+' : '';
-                flowDelta.innerText = `${sign}${pct.toFixed(1)}% vs base`;
-                flowDelta.style.color = pct >= 0 ? "#34d399" : "#f87171";
-            }
-        }
-
-        // NPF
-        setText('phys-card-npf', cur.npf.toFixed(2));
-        const npfDelta = document.getElementById('phys-card-npf-delta');
-        if (npfDelta) {
-            if (selectedYear === 0) {
-                npfDelta.innerText = "Baseline";
-                npfDelta.style.color = "var(--text-secondary)";
-            } else {
-                const pct = ((cur.npf - base.npf) / base.npf) * 100;
-                const sign = pct >= 0 ? '+' : '';
-                npfDelta.innerText = `${sign}${pct.toFixed(1)}% vs base`;
-                npfDelta.style.color = pct >= 0 ? "#34d399" : "#f87171";
-            }
-        }
-
-        // FRI, B_Rel, Recovery, TDS, SEC, CIPs
-        setText('phys-card-fri',  cur.fri.toFixed(2));
-        setText('phys-card-brel', cur.b_relative.toFixed(2));
-        setText('phys-card-rec',  (cur.recovery * 100).toFixed(1));
-        setText('phys-card-tds',  cur.perm_tds.toFixed(1));
-        setText('phys-card-sec',  cur.sec_kwh_m3.toFixed(2));
-        setText('phys-card-cips', cur.cip_count);
-    }
-    
-    // 4. Render Table Body
-    const tbody = document.getElementById('phys-annual-tbody');
-    if (tbody) {
-        tbody.innerHTML = snapshots.map(s => {
-            const isSel = s.year === selectedYear;
-            const style = isSel ? 'background: rgba(99, 102, 241, 0.08); font-weight: 600;' : '';
-            return `
-                <tr style="${style}">
-                    <td><strong>Year ${s.year}</strong></td>
-                    <td>${s.perm_flow.toFixed(2)}</td>
-                    <td>${(s.recovery * 100).toFixed(1)}%</td>
-                    <td>${s.feed_pressure_bar.toFixed(1)}</td>
-                    <td>${s.perm_tds.toFixed(1)}</td>
-                    <td>${s.sec_kwh_m3.toFixed(2)}</td>
-                    <td>${s.npf.toFixed(2)}</td>
-                    <td>${s.nsp.toFixed(2)}</td>
-                    <td>${s.fri.toFixed(2)}</td>
-                    <td>${s.b_relative.toFixed(2)}</td>
-                    <td><span style="padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; background: ${s.cip_triggered ? 'rgba(245, 158, 11, 0.15); color: #fbbf24;' : 'rgba(16, 185, 129, 0.15); color: #34d399;' }">${s.cip_triggered ? 'CIP Needed' : 'Normal'}</span></td>
-                    <td>${s.cip_count}</td>
-                </tr>
-            `;
-        }).join('');
-    }
-    
-    // 5. Render Charts
-    window.renderPhysicsCharts(snapshots);
-
-    // 6. Update Fouling Breakdown
-    const foulTbody = document.getElementById('phys-fouling-tbody');
-    const foulingLabel = document.getElementById('phys-fouling-year-label');
-    if (foulingLabel) foulingLabel.innerText = `Year ${selectedYear}`;
-    if (foulTbody && cur && base) {
-        const totalR = (cur.rc_avg || 0) + (cur.rb_avg || 0) + (cur.rs_avg || 0) + (cur.rn_avg || 0) + (cur.rcomp || 0);
-        const mechanisms = [
-            { name: "Particulate/Cake (Rc)", val: cur.rc_avg || 0 },
-            { name: "Biofouling (Rb)", val: cur.rb_avg || 0 },
-            { name: "Scaling (Rs)", val: cur.rs_avg || 0 },
-            { name: "Organic/NOM (Rn)", val: cur.rn_avg || 0 },
-            { name: "Compaction (Rcomp)", val: cur.rcomp || 0 }
-        ];
-        foulTbody.innerHTML = mechanisms.map(m => {
-            const pct = totalR > 0 ? (m.val / totalR) * 100 : 0;
-            const status = pct > 40 ? '<span style="color:#ef4444;font-weight:bold;">Critical</span>' : (pct > 20 ? '<span style="color:#f59e0b;font-weight:bold;">Elevated</span>' : '<span style="color:#10b981;">Normal</span>');
-            return `<tr><td>${m.name}</td><td>${m.val.toExponential(2)}</td><td>${pct.toFixed(1)}%</td><td>${status}</td></tr>`;
-        }).join('');
-    }
-
-    // 7. Update SI Comparison
-    const siTbody = document.getElementById('phys-si-tbody');
-    const siLabel = document.getElementById('phys-si-year-label');
-    if (siLabel) siLabel.innerText = `Year ${selectedYear}`;
-    if (siTbody && cur && base) {
-        const minerals = [
-            { name: "Calcite", bulk: cur.si_calcite_bulk, yr0: base.si_calcite_wall || 0, cur: cur.si_calcite_wall || 0, limit: 1.5 },
-            { name: "Gypsum", bulk: cur.si_gypsum_bulk, yr0: base.si_gypsum_wall || 0, cur: cur.si_gypsum_wall || 0, limit: 0.0 },
-            { name: "Barite", bulk: cur.si_barite_bulk, yr0: base.si_barite_wall || 0, cur: cur.si_barite_wall || 0, limit: 0.0 },
-            { name: "Silica", bulk: cur.si_silica_bulk, yr0: base.si_silica_wall || 0, cur: cur.si_silica_wall || 0, limit: 0.0 }
-        ];
-        siTbody.innerHTML = minerals.map(m => {
-            const status = m.cur > m.limit ? '<span style="color:#ef4444;font-weight:bold;">High Risk</span>' : '<span style="color:#10b981;">Low Risk</span>';
-            const bulkVal = typeof m.bulk === 'number' ? m.bulk.toFixed(2) : '--';
-            return `<tr><td>${m.name}</td><td>${bulkVal}</td><td>${m.yr0.toFixed(2)}</td><td><strong>${m.cur.toFixed(2)}</strong></td><td>${status}</td></tr>`;
-        }).join('');
-    }
-};
-
-window.renderPhysicsCharts = function(snapshots) {
-    const labels = snapshots.map(s => `Year ${s.year}`);
-    const npfData = snapshots.map(s => s.npf);
-    const nspData = snapshots.map(s => s.nsp);
-    
-    // 1. NPF & NSP Chart
-    const ctxNpf = document.getElementById('phys-npf-chart');
-    if (ctxNpf) {
-        if (window.physNpfChartInstance) window.physNpfChartInstance.destroy();
-        window.physNpfChartInstance = new Chart(ctxNpf, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'NPF (Normalized Flow)',
-                        data: npfData,
-                        borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.05)',
-                        borderWidth: 2,
-                        tension: 0.25,
-                        fill: true
-                    },
-                    {
-                        label: 'NSP (Normalized Salt Passage)',
-                        data: nspData,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
-                        borderWidth: 2,
-                        tension: 0.25,
-                        fill: true
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#94a3b8' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: { color: '#e2e8f0', font: { size: 10 } }
-                    }
-                }
-            }
-        });
-    }
-    
-    // 2. Fouling Mechanism Chart
-    const ctxFouling = document.getElementById('phys-fouling-chart');
-    if (ctxFouling) {
-        const rcData = snapshots.map(s => s.rc_avg || 0);
-        const rbData = snapshots.map(s => s.rb_avg || 0);
-        const rnData = snapshots.map(s => s.rn_avg || 0);
-        const rsData = snapshots.map(s => s.rs_avg || 0);
-        
-        if (window.physFoulingChartInstance) window.physFoulingChartInstance.destroy();
-        window.physFoulingChartInstance = new Chart(ctxFouling, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Cake Filtration',
-                        data: rcData,
-                        backgroundColor: '#ef4444'
-                    },
-                    {
-                        label: 'Biofouling',
-                        data: rbData,
-                        backgroundColor: '#10b981'
-                    },
-                    {
-                        label: 'NOM Adsorption',
-                        data: rnData,
-                        backgroundColor: '#3b82f6'
-                    },
-                    {
-                        label: 'Mineral Scaling',
-                        data: rsData,
-                        backgroundColor: '#fb923c'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        stacked: true,
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' }
-                    },
-                    x: {
-                        stacked: true,
-                        grid: { display: false },
-                        ticks: { color: '#94a3b8' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: { color: '#e2e8f0', font: { size: 10 } }
-                    }
-                }
-            }
-        });
-    }
-
-    // 3. Feed Pressure & SEC Trend Chart
-    const ctxPressure = document.getElementById('phys-pressure-chart');
-    if (ctxPressure) {
-        const pressureData = snapshots.map(s => s.feed_pressure_bar || 0);
-        const secData = snapshots.map(s => s.sec_kwh_m3 || 0);
-        
-        if (window.physPressureChartInstance) window.physPressureChartInstance.destroy();
-        window.physPressureChartInstance = new Chart(ctxPressure, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Feed Pressure (bar)',
-                        data: pressureData,
-                        borderColor: '#fbbf24',
-                        backgroundColor: 'rgba(251, 191, 36, 0.05)',
-                        borderWidth: 2,
-                        tension: 0.25,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'SEC (kWh/m³)',
-                        data: secData,
-                        borderColor: '#a855f7',
-                        backgroundColor: 'rgba(168, 85, 247, 0.05)',
-                        borderWidth: 2,
-                        tension: 0.25,
-                        yAxisID: 'y1'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        grid: { display: false },
-                        ticks: { color: '#94a3b8' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#94a3b8' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        labels: { color: '#e2e8f0', font: { size: 10 } }
-                    }
-                }
-            }
-        });
-    }
-};
-
-// --- Membrane Directory Modal Logic ---
-window.membraneDbCache = { ro: [], nf: [], uf: [] };
-window.activeMembraneTab = 'RO';
-
-window.handleMembraneDbClick = function(e) {
-    const btn = document.getElementById('membrane-db-btn');
-    if (btn && btn.classList.contains('pace-locked-tab')) {
-        const toast = document.getElementById('pace-lock-toast');
-        if (toast) {
-            toast.style.display = 'flex';
-            setTimeout(() => { toast.style.display = 'none'; }, 3000);
-        }
-        return;
-    }
-    window.openMembraneDbModal();
-};
-
-window.openMembraneDbModal = async function() {
-    const btn = document.getElementById('membrane-db-btn');
-    if (btn) btn.classList.add('active');
-
-    const modal = document.getElementById('membrane-db-modal');
-    if (modal) modal.classList.add('is-active');
-    
-    const tbody = document.getElementById('pace-db-tbody');
-    const countEl = document.getElementById('pace-db-count');
-    
-    // Clear and show loading
-    if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa-solid fa-spinner fa-spin"></i> Fetching membrane database...</td></tr>`;
-    if (countEl) countEl.innerText = "Loading membranes...";
-
-    try {
-        const response = await fetch('http://localhost:8000/api/membranes');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
-        const data = await response.json();
-        const roMems = data.ro_membranes || [];
-        const ufMems = data.uf_modules || [];
-        
-        // Segregate into cache
-        // RO: Only show Permionics' membranes
-        window.membraneDbCache.ro = roMems.filter(m => {
-            const type = (m.type || '').toUpperCase();
-            const isRO = type === 'BWRO' || type === 'SWRO' || type === 'RO';
-            const isPerm = m.manufacturer && m.manufacturer.toLowerCase() === 'permionics';
-            return isRO && isPerm;
-        });
-
-        // NF: Show all NF membranes available in the database (no manufacturer filter)
-        window.membraneDbCache.nf = roMems.filter(m => {
-            const type = (m.type || '').toUpperCase();
-            return type === 'NF';
-        });
-
-        // UF: Show all UF modules available in the database (no manufacturer filter)
-        window.membraneDbCache.uf = ufMems.map(m => {
-            return {
-                id: m.id,
-                name: m.name,
-                type: 'UF',
-                manufacturer: m.manufacturer || 'FilmTec',
-                area: m.area,
-                feed_spacer_mil: null,
-                nominal_rejection: null,
-                max_pressure_bar: 3.0,
-                max_feed_flow_m3h: null,
-                max_recovery_pct: 95.0,
-                length_m: null,
-                diameter_m: null,
-                material: 'PVDF'
-            };
-        });
-
-        // Default to RO tab
-        window.switchMembraneTypeTab('RO');
-
-    } catch (err) {
-        console.warn("API database fetch failed, falling back to local membrane database cache:", err);
-        try {
-            const localMems = Object.entries(window.roMembranes || {}).map(([k, v]) => {
-                return {
-                    id: k,
-                    name: k,
-                    type: v.type,
-                    manufacturer: v.manufacturer,
-                    area: v.active_area_m2,
-                    feed_spacer_mil: v.feed_spacer_mil,
-                    nominal_rejection: v.nominal_rejection,
-                    max_pressure_bar: v.max_pressure_bar,
-                    max_feed_flow_m3h: v.max_feed_flow_m3h,
-                    min_conc_flow_m3h: v.min_conc_flow_m3h,
-                    max_recovery_pct: v.max_recovery_pct,
-                    length_m: v.length_m,
-                    diameter_m: v.diameter_m,
-                    material: v.material || 'Polyamide Composite'
-                };
-            });
-            
-            // RO: Only show Permionics' membranes
-            window.membraneDbCache.ro = localMems.filter(m => {
-                const type = (m.type || '').toUpperCase();
-                const isRO = type === 'BWRO' || type === 'SWRO' || type === 'RO';
-                const isPerm = m.manufacturer && m.manufacturer.toLowerCase() === 'permionics';
-                return isRO && isPerm;
-            });
-
-            // NF: Show all NF membranes available in the database
-            window.membraneDbCache.nf = localMems.filter(m => {
-                const type = (m.type || '').toUpperCase();
-                return type === 'NF';
-            });
-
-            // UF fallback
-            window.membraneDbCache.uf = [
-                { id: "SFP-2860", name: "SFP-2860", type: "UF", manufacturer: "FilmTec", area: 51.0, feed_spacer_mil: null, nominal_rejection: null, max_pressure_bar: 3.0, max_feed_flow_m3h: null, max_recovery_pct: 95.0, length_m: null, diameter_m: null, material: "PVDF" },
-                { id: "SFP-2880", name: "SFP-2880", type: "UF", manufacturer: "FilmTec", area: 77.0, feed_spacer_mil: null, nominal_rejection: null, max_pressure_bar: 3.0, max_feed_flow_m3h: null, max_recovery_pct: 95.0, length_m: null, diameter_m: null, material: "PVDF" }
-            ];
-
-            window.switchMembraneTypeTab('RO');
-        } catch (fallbackErr) {
-            console.error("Local fallback failed:", fallbackErr);
-            if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Error loading database: ${err.message}</td></tr>`;
-            if (countEl) countEl.innerText = "Failed to load.";
-        }
-    }
-};
-
-window.closeMembraneDbModal = function() {
-    const btn = document.getElementById('membrane-db-btn');
-    if (btn) btn.classList.remove('active');
-
-    const modal = document.getElementById('membrane-db-modal');
-    if (modal) modal.classList.remove('is-active');
-};
-
-window.switchMembraneTypeTab = function(tabName) {
-    window.activeMembraneTab = tabName;
-    
-    // Update active state of pills
-    document.querySelectorAll('.membrane-tabs .tab-pill').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.border = '1px solid transparent';
-        btn.style.background = 'transparent';
-        btn.style.color = 'var(--text-secondary)';
-    });
-    
-    const activeBtn = document.getElementById(`mem-tab-${tabName.toLowerCase()}`);
-    if (activeBtn) {
-        activeBtn.classList.add('active');
-        activeBtn.style.border = '1px solid var(--accent-color)';
-        activeBtn.style.background = 'rgba(59, 130, 246, 0.1)';
-        activeBtn.style.color = 'var(--text-primary)';
-    }
-
-    // Refresh display
-    window.filterMembraneDbTable();
-};
-
-window.renderMembraneDbTable = function(membranes) {
-    const tbody = document.getElementById('pace-db-tbody');
-    const countEl = document.getElementById('pace-db-count');
-    
-    if (countEl) countEl.innerText = `${membranes.length} membranes found`;
-    if (!tbody) return;
-
-    if (membranes.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No matching membranes found.</td></tr>`;
-        return;
-    }
-
-    tbody.innerHTML = membranes.map(m => {
-        let typeBadge = '';
-        if (m.type === 'SWRO') typeBadge = `<span class="pace-badge pace-badge-sw">SWRO</span>`;
-        else if (m.type === 'BWRO') typeBadge = `<span class="pace-badge pace-badge-bw">BWRO</span>`;
-        else if (m.type === 'NF') typeBadge = `<span class="pace-badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4);">NF</span>`;
-        else if (m.type === 'UF') typeBadge = `<span class="pace-badge" style="background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4);">UF</span>`;
-        else typeBadge = `<span class="pace-badge pace-badge-bw">${m.type || 'RO'}</span>`;
-        
-        const mat = m.material || 'Polyamide Composite';
-        const area = m.area ? `${m.area.toFixed(1)} m²` : '--';
-        const spacer = m.feed_spacer_mil ? `${m.feed_spacer_mil} mil` : '--';
-        const rej = m.nominal_rejection ? `${(m.nominal_rejection * 100).toFixed(2)}%` : '--';
-        const press = m.max_pressure_bar ? `${m.max_pressure_bar.toFixed(1)} bar` : '--';
-        const maxFlow = m.max_feed_flow_m3h ? `${m.max_feed_flow_m3h.toFixed(2)} m³/h` : '--';
-        const maxRec = m.max_recovery_pct ? `${m.max_recovery_pct.toFixed(0)}%` : '--';
-
-        return `
-            <tr>
-                <td style="font-weight: 700;">${m.id}</td>
-                <td>${typeBadge}</td>
-                <td style="font-weight: 500; color: var(--text-secondary);">${mat}</td>
-                <td>${area}</td>
-                <td>${spacer}</td>
-                <td><strong>${rej}</strong></td>
-                <td>${press}</td>
-                <td>${maxFlow}</td>
-                <td>${maxRec}</td>
-            </tr>
-        `;
-    }).join('');
-};
-
-window.filterMembraneDbTable = function() {
-    const q = document.getElementById('pace-db-search').value.toLowerCase().trim();
-    const activeTab = window.activeMembraneTab || 'RO';
-    
-    let list = [];
-    if (activeTab === 'RO') list = window.membraneDbCache.ro;
-    else if (activeTab === 'NF') list = window.membraneDbCache.nf;
-    else if (activeTab === 'UF') list = window.membraneDbCache.uf;
-
-    if (q) {
-        list = list.filter(m => {
-            return (
-                m.id.toLowerCase().includes(q) ||
-                (m.type && m.type.toLowerCase().includes(q)) ||
-                (m.material && m.material.toLowerCase().includes(q)) ||
-                (m.area && m.area.toString().includes(q))
-            );
-        });
-    }
-    window.renderMembraneDbTable(list);
-};
-
-window.openUserInfoModal = function(event) {
-    if (event) event.preventDefault();
-    const modal = document.getElementById('user-info-modal');
-    if (modal) modal.classList.add('is-active');
-};
-
-window.closeUserInfoModal = function() {
-    const modal = document.getElementById('user-info-modal');
-    if (modal) modal.classList.remove('is-active');
-};
-
-window.saveUserInfoModal = function() {
-    const data = {
-        firstName: document.getElementById('user-first-name').value.trim(),
-        lastName: document.getElementById('user-last-name').value.trim(),
-        company: document.getElementById('user-company').value.trim(),
-        email: document.getElementById('user-email').value.trim(),
-        office: document.getElementById('user-office').value.trim(),
-        mobile: document.getElementById('user-mobile').value.trim(),
-        fax: document.getElementById('user-fax').value.trim(),
-        street: document.getElementById('user-street').value.trim(),
-        city: document.getElementById('user-city').value.trim(),
-        country: document.getElementById('user-country').value.trim(),
-        uiLang: document.getElementById('user-ui-lang').value,
-        reportLang: document.getElementById('user-report-lang').value
-    };
-    
-    localStorage.setItem('pace_user_info', JSON.stringify(data));
-    
-    // Update initials in profile icon
-    let initials = '';
-    if (data.firstName) initials += data.firstName[0];
-    if (data.lastName) initials += data.lastName[0];
-    initials = initials.toUpperCase() || 'JD';
-    
-    const profileBtn = document.querySelector('.user-profile');
-    if (profileBtn) profileBtn.textContent = initials;
-    
-    window.closeUserInfoModal();
-};
-
-
-/* ==========================================================================
-   Membrane Aging Simulation (Time-series / Single Pass)
-   ========================================================================== */
-
-window.getFeedWaterData = function() {
-    const safeVal = (id) => {
-        const el = document.getElementById(id);
-        if (!el) return 0;
-        return parseFloat(el.value || el.textContent) || 0;
-    };
-
-    return {
-        calcium: safeVal('ca'),
-        magnesium: safeVal('mg'),
-        sodium: safeVal('na'),
-        potassium: safeVal('k'),
-        ammonium: safeVal('nh4'),
-        barium: safeVal('ba'),
-        strontium: safeVal('sr'),
-        chloride: safeVal('cl'),
-        sulfate: safeVal('so4'),
-        bicarbonate: safeVal('hco3'),
-        carbonate: safeVal('co3'),
-        nitrate: safeVal('no3'),
-        fluoride: safeVal('f'),
-        phosphate: safeVal('po4'),
-        silica: safeVal('sio2'),
-        ph: safeVal('ph') || 7.0,
-        temperature: safeVal('temp') || 25.0,
-        tds: parseFloat(document.getElementById('calc-tds')?.textContent) || 0.0,
-        tss: safeVal('tss'),
-        turbidity: safeVal('turbidity')
-    };
-};
-
-window.runAgingSimulation = async function() {
-    const btn = document.getElementById('aging-run-btn');
-    if (!btn) return;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Simulating Aging...';
-    btn.disabled = true;
-
-    try {
-        const feedWater = window.getFeedWaterData();
-        const flow = parseFloat(document.getElementById('flow').value) || 10.0;
-        const recovery = parseFloat(document.getElementById('recovery').value) || 75.0;
-
-        const payload = {
-            technology_train: document.getElementById('calc-tech-train') ? document.getElementById('calc-tech-train').value : 'RO',
-            feed_water: feedWater,
-            system_config: {
-                membrane: document.getElementById('ro-membrane') ? document.getElementById('ro-membrane').value : 'BW30-400',
-                stages: parseInt(document.getElementById('stages') ? document.getElementById('stages').value : 1),
-                vessels_per_stage: (document.getElementById('vessels-stage-1') ? [parseInt(document.getElementById('vessels-stage-1').value), parseInt(document.getElementById('vessels-stage-2') ? document.getElementById('vessels-stage-2').value : 0)].filter(v => v>0) : [1]),
-                elements_per_vessel: parseInt(document.getElementById('elements-per-vessel') ? document.getElementById('elements-per-vessel').value : 6),
-                target_recovery_pct: recovery
-            },
-            aging_config: {
-                design_life_months: parseInt(document.getElementById('aging-design-life').value) || 60,
-                time_step_months: 1,
-                simulation_mode: document.getElementById('aging-sim-mode').value || 'constant_recovery',
-                cip_trigger: document.getElementById('aging-cip-mode').value || 'scheduled',
-                cip_interval_days: parseInt(document.getElementById('aging-cip-interval').value) || 90,
-                cip_type: 'acid_alkaline_sequential',
-                antiscalant_dosed: document.getElementById('aging-antiscalant').checked
-            },
-            feed_history: {
-                sdi15: parseFloat(document.getElementById('aging-sdi').value) || 3.0,
-                toc_mg_l: parseFloat(document.getElementById('aging-toc').value) || 2.0,
-                temperature_c: parseFloat(document.getElementById('aging-temp').value) || 28.0,
-                cl2_residual_mg_l: parseFloat(document.getElementById('aging-cl2').value) || 0.0
-            },
-            target_flow_m3h: flow
-        };
-
-        const response = await fetch('http://localhost:8000/api/simulate-aging', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || 'Simulation failed');
-        }
-
-        const result = await response.json();
-        window.renderAgingResults(result, payload.aging_config.design_life_months);
-
-    } catch (error) {
-        console.error(error);
-        alert('Aging simulation failed: ' + error.message);
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }
-};
-
-window.renderAgingResults = function(data, designLifeMonths) {
-    // Reveal Cards
-    document.getElementById('aging-eol-card').style.display = 'block';
-    document.getElementById('aging-autopsy-card').style.display = 'block';
-    document.getElementById('aging-highlights-card').style.display = 'block';
-    document.getElementById('aging-chart-card').style.display = 'block';
-    document.getElementById('aging-mechanism-card').style.display = 'block';
-    document.getElementById('aging-table-card').style.display = 'block';
-
-    const profile = data.aging_profile || [];
-    const finalMonthState = profile[profile.length - 1] || {};
-
-    // Highlights
-    document.getElementById('aging-hl-npf').textContent = finalMonthState.npf ? finalMonthState.npf.toFixed(2) : '1.00';
-    document.getElementById('aging-hl-pfeed').textContent = finalMonthState.p_feed_bar ? finalMonthState.p_feed_bar.toFixed(1) : '--';
-    document.getElementById('aging-hl-cips').textContent = data.cip_events ? data.cip_events.length : 0;
-    
-    const eolReached = data.end_of_life_month !== null;
-    const eolMonthStr = eolReached ? data.end_of_life_month : `> ${designLifeMonths}`;
-    document.getElementById('aging-eol-month').textContent = eolMonthStr;
-    document.getElementById('aging-hl-eol').textContent = eolMonthStr;
-    document.getElementById('aging-dominant-mech').textContent = (data.dominant_mechanism || 'N/A').replace('_', ' ').toUpperCase();
-
-    // Monthly Profile Table
-    const tbody = document.getElementById('aging-monthly-tbody');
-    if (tbody) {
-        tbody.innerHTML = '';
-        profile.forEach(pt => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>Month ${pt.month}</td>
-                <td style="color: var(--accent-color); font-weight: 600;">${pt.p_feed_bar.toFixed(2)}</td>
-                <td>${pt.npf.toFixed(2)}</td>
-                <td>${(pt.nsr * 100).toFixed(1)}%</td>
-                <td>${pt.delta_p_ratio.toFixed(2)}</td>
-                <td>${pt.flux_lmh.toFixed(1)}</td>
-                <td>${pt.recovery_pct.toFixed(1)}%</td>
-                <td>${pt.cip_event ? '✅' : ''}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    // Autopsy Table
-    const autoTbody = document.getElementById('aging-autopsy-tbody');
-    if (autoTbody && data.element_autopsy) {
-        autoTbody.innerHTML = '';
-        const sortedKeys = Object.keys(data.element_autopsy).sort((a, b) => {
-            const m1 = a.match(/s(\d+)_e(\d+)/);
-            const m2 = b.match(/s(\d+)_e(\d+)/);
-            if (m1 && m2) {
-                const s1 = parseInt(m1[1]), e1 = parseInt(m1[2]);
-                const s2 = parseInt(m2[1]), e2 = parseInt(m2[2]);
-                return s1 !== s2 ? s1 - s2 : e1 - e2;
-            }
-            return 0;
-        });
-
-        sortedKeys.forEach(key => {
-            const el = data.element_autopsy[key];
-            const m = key.match(/s(\d+)_e(\d+)/);
-            const nameStr = m ? `Stage ${m[1]} - Element ${m[2]}` : key;
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${nameStr}</strong></td>
-                <td>${el.fri_cake.toFixed(3)}</td>
-                <td>${el.fri_bio.toFixed(3)}</td>
-                <td>${el.fri_nom.toFixed(3)}</td>
-                <td>${el.fri_scale.toFixed(3)}</td>
-                <td style="font-weight: bold;">${el.fri_total.toFixed(3)}</td>
-                <td>${(el.a_eff * 100).toFixed(1)}%</td>
-            `;
-            autoTbody.appendChild(tr);
-        });
-    }
-
-    // Mechanism Breakdown Chart (Doughnut)
-    window.drawMechanismChart(data.mechanism_totals || {});
-
-    // Performance Chart (Line Chart)
-    window.drawPerformanceChart(profile);
-};
-
-window.agingChartInstance = null;
-window.mechanismChartInstance = null;
-
-window.drawPerformanceChart = function(profile) {
-    const ctxEl = document.getElementById('aging-canvas-npf');
-    if (!ctxEl) return;
-    const ctx = ctxEl.getContext('2d');
-    
-    if (window.agingChartInstance) {
-        window.agingChartInstance.destroy();
-    }
-
-    const labels = profile.map(s => `Month ${s.month}`);
-    const npfData = profile.map(s => s.npf);
-    const pressData = profile.map(s => s.p_feed_bar);
-    const cipPoints = profile.map(s => s.cip_event ? s.npf : null);
-
-    window.agingChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'NPF (Normalized Flow Ratio)',
-                    data: npfData,
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                    yAxisID: 'y',
-                    fill: true,
-                    tension: 0.1
-                },
-                {
-                    label: 'Feed Pressure (bar)',
-                    data: pressData,
-                    borderColor: '#ef4444',
-                    borderDash: [5, 5],
-                    yAxisID: 'y1',
-                    fill: false,
-                    tension: 0.1
-                },
-                {
-                    label: 'CIP Events',
-                    data: cipPoints,
-                    type: 'scatter',
-                    backgroundColor: '#fb923c',
-                    pointRadius: 6,
-                    pointHoverRadius: 8,
-                    yAxisID: 'y'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#94a3b8' }
-                },
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    ticks: { color: '#94a3b8' },
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    title: { display: true, text: 'NPF Ratio', color: '#94a3b8' }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    ticks: { color: '#94a3b8' },
-                    title: { display: true, text: 'Pressure (bar)', color: '#94a3b8' },
-                    grid: { drawOnChartArea: false }
-                }
-            },
-            plugins: {
-                legend: {
-                    labels: { color: '#e2e8f0', font: { size: 10 } }
-                }
-            }
-        }
-    });
-};
-
-window.drawMechanismChart = function(totals) {
-    const ctxEl = document.getElementById('aging-canvas-mechanism');
-    if (!ctxEl) return;
-    const ctx = ctxEl.getContext('2d');
-    
-    if (window.mechanismChartInstance) {
-        window.mechanismChartInstance.destroy();
-    }
-
-    const data = [
-        totals.cake || 0,
-        totals.bio || 0,
-        totals.nom || 0,
-        totals.scale || 0,
-        totals.irreversible || 0
-    ];
-
-    window.mechanismChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Particulate', 'Biofouling', 'Organic', 'Scaling', 'Irreversible (Comp/Oxid)'],
-            datasets: [{
-                data: data,
-                backgroundColor: [
-                    '#f59e0b', // amber
-                    '#10b981', // emerald
-                    '#8b5cf6', // violet
-                    '#3b82f6', // blue
-                    '#ef4444'  // red
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: { boxWidth: 12, font: { size: 10 }, color: '#e2e8f0' }
-                }
-            }
-        }
-    });
-};

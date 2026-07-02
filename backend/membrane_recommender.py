@@ -21,14 +21,24 @@ class MembraneRecommender:
         """
         target_tds = inputs.get("target_tds", 50.0)
         source_type = inputs.get("source_type", "LOW_TDS").upper()
+        tech_train = inputs.get("technology_train", "RO").upper()
+        is_nf_train = "NF" in tech_train
         
-        candidates = {
-            k: v for k, v in MembraneDatabase.RO_MEMBRANES.items()
-            if v.get("manufacturer", "").lower() == "permionics"
-        }
+        if is_nf_train:
+            # Recommend NF membranes (usually DuPont in the database)
+            candidates = {
+                k: v for k, v in MembraneDatabase.RO_MEMBRANES.items()
+                if v.get("type") == "NF"
+            }
+        else:
+            # Recommend Permionics RO membranes
+            candidates = {
+                k: v for k, v in MembraneDatabase.RO_MEMBRANES.items()
+                if v.get("manufacturer", "").lower() == "permionics" and v.get("type") in ["BWRO", "SWRO"]
+            }
         
         if not candidates:
-            return {"recommendations": [], "message": "No Permionics membranes found."}
+            return {"recommendations": [], "message": "No matching membranes found for the selected technology train."}
             
         results = []
         engine = SystemEngine()
@@ -58,6 +68,7 @@ class MembraneRecommender:
                     "max_beta": score_card.get("max_beta", 1.0),
                     "criteria_scores": score_card["criteria"],
                     "justification": score_card["justification"],
+                    "estimated_vessels": test_inputs.get("vessels_per_stage", [4, 2]),
                     "calculated_metrics": {
                         "permeate_tds": round(ro["summary"].get("perm_tds", 0), 2),
                         "feed_pressure_bar": round(ro["summary"].get("feed_pressure_bar", 0), 2),
@@ -75,7 +86,13 @@ class MembraneRecommender:
                     "is_disqualified": True,
                     "disqualification_reason": f"Calculation failed: {str(e)}",
                     "criteria_scores": {},
-                    "justification": []
+                    "justification": [],
+                    "estimated_vessels": test_inputs.get("vessels_per_stage", [4, 2]),
+                    "calculated_metrics": {
+                        "permeate_tds": 0.0,
+                        "feed_pressure_bar": 0.0,
+                        "specific_energy": 0.0
+                    }
                 })
 
         # Sort results: non-disqualified first, then by score descending
@@ -174,7 +191,7 @@ class MembraneRecommender:
         max_beta = max([e.get("beta", 1.0) for e in elements] + [1.0])
         if max_beta > 1.20:
             env_score -= min(10, (max_beta - 1.20) * 50)
-            justification.append(f"High concentration polarization (Beta={max_beta:.2f}). Ensure sufficient cross-flow.")
+            justification.append(f"High concentration polarization (\u03b2={max_beta:.2f}). Ensure sufficient cross-flow.")
         
         env_score = max(0, env_score)
         criteria["envelope"] = round(env_score, 1)

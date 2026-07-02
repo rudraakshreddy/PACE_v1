@@ -12,7 +12,11 @@ class UFEngine:
         pass
         
     def _viscosity_correction(self, temp_c: float) -> float:
-        """Calculate dynamic viscosity ratio relative to 20°C"""
+        """
+        Calculates dynamic viscosity correction factor relative to 20°C.
+        Uses the empirical Arrhenius equation of state to determine viscosity 
+        changes as a function of temperature (K).
+        """
         # Dynamic viscosity of water (Pa.s)
         mu_T = 1.0e-3 * math.exp(1808.0 / (temp_c + 273.15) - 6.354)
         mu_20 = 1.0e-3 * math.exp(1808.0 / (20.0 + 273.15) - 6.354)
@@ -27,7 +31,10 @@ class UFEngine:
                     feed_tds: float = 4000.0,
                     feed_ph: float = 7.3) -> Dict[str, Any]:
         """
-        Calculates UF system parameters based on design flow and selected module.
+        Simulates Ultrafiltration (UF) system behavior.
+        Estimates required modules, actual operating flux, backwash and forward-flush water losses,
+        net product flow, system recovery, clean/fouled Trans-Membrane Pressure (TMP) 
+        across varying operating temperatures, and generates safety limit warnings.
         """
         module = MembraneDatabase.get_uf_module(module_name)
         

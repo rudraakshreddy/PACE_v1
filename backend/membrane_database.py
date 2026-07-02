@@ -102,35 +102,125 @@ class MembraneDatabase:
                 "NH4": 0.900
             }
         },
-        "NF90-400": {
+        "NF270-400": {
             "type": "NF",
             "manufacturer": "DuPont",
+            "description": "High-permeability NF membrane; excellent divalent rejection, partial monovalent passage. FilmTec NF270-400/34i.",
             "active_area_m2": 37.2,
-            "permeability_A": 4.5,  # Higher permeability
-            "permeability_B": 8.0e-7, # Higher passage for monovalents
+            "permeability_A": 7.60,       # L/m²/h/bar @ 25°C — spec Table 3
+            "permeability_B": 5.80e-7,    # Ps_NaCl used as backward-compat B proxy (m/s)
+            "E_Aw_over_R": 2640,          # Activation energy / R (K) — spec Table 3
             "feed_spacer_mil": 34,
             "max_pressure_bar": 41.0,
             "max_feed_flow_m3h": 15.9,
-            "min_conc_flow_m3h": 3.0,
-            "max_recovery_pct": 15.0,
+            "min_conc_flow_m3h": 0.9,     # 4 gpm — spec Table 1
+            "max_recovery_pct": 20.0,     # Per-element recovery limit (NF operates at higher system recovery)
             "length_m": 1.016,
             "diameter_m": 0.201,
+            "max_temp_c": 45.0,
+            "ph_range": [2.0, 11.0],
+            "max_chlorine_mgL": 0.1,
+            "max_sdi_15": 5.0,
+            # Spiegler-Kedem reflection coefficients (σ) per ion — spec Tables 3 & 5
+            # Group 1 (divalent anions): SO4, PO4  → σ = 0.960 (MgSO4 test)
+            # Group 2 (divalent cations): Ca, Mg, Sr, Ba → σ = 0.780 (CaCl2 test)
+            # Group 3 (monovalent ions): Na, K, Cl, F, NH4 → σ = 0.347 (NaCl test)
+            # Group 4 (uncharged): SiO2, B → σ = 0.100
+            # Specific values: HCO3 = 0.400, NO3 = 0.320 (Table 3)
             "sigma": {
-                "Ca": 0.980,   # High rejection of divalents
-                "Mg": 0.980,
-                "Na": 0.850,   # High passage of monovalents
-                "K": 0.850,
-                "Cl": 0.850,
-                "SO4": 0.990,  # High rejection of divalents
-                "HCO3": 0.800,
-                "Ba": 0.985,
-                "Sr": 0.985,
-                "F": 0.800,
-                "SiO2": 0.850,
-                "B": 0.400,
-                "NO3": 0.700,
-                "PO4": 0.980,
-                "NH4": 0.750
+                "Na":   0.347,  "K":   0.347,  "Cl":  0.347,
+                "NO3":  0.320,  "F":   0.347,  "NH4": 0.347,
+                "Ca":   0.780,  "Mg":  0.780,  "Sr":  0.780,
+                "Ba":   0.780,  "Fe":  0.780,  "Mn":  0.780,
+                "SO4":  0.960,  "PO4": 0.960,
+                "HCO3": 0.400,
+                "SiO2": 0.100,  "B":   0.100,  "Al":  0.347,
+            },
+            # Spiegler-Kedem solute permeabilities Ps (m/s) per ion — spec Tables 3 & 5
+            "nf_ps": {
+                "Na":   5.80e-7, "K":   5.80e-7, "Cl":  5.80e-7,
+                "NO3":  6.10e-7, "F":   5.80e-7, "NH4": 5.80e-7,
+                "Ca":   2.80e-7, "Mg":  2.80e-7, "Sr":  2.80e-7,
+                "Ba":   2.80e-7, "Fe":  2.80e-7, "Mn":  2.80e-7,
+                "SO4":  3.60e-8, "PO4": 3.60e-8,
+                "HCO3": 4.20e-7,
+                "SiO2": 1.20e-6, "B":   1.20e-6, "Al":  5.80e-7,
+            }
+        },
+        "NF200-400": {
+            "type": "NF",
+            "manufacturer": "DuPont",
+            "description": "Medium-tight NF membrane; moderate monovalent rejection, high divalent rejection. FilmTec NF200-400/34i.",
+            "active_area_m2": 37.2,
+            "permeability_A": 4.50,       # L/m²/h/bar @ 25°C — spec Table 3
+            "permeability_B": 3.50e-7,    # Ps_NaCl as B proxy (m/s)
+            "E_Aw_over_R": 2400,          # Activation energy / R (K) — spec Table 3
+            "feed_spacer_mil": 34,
+            "max_pressure_bar": 41.0,
+            "max_feed_flow_m3h": 15.9,
+            "min_conc_flow_m3h": 0.9,
+            "max_recovery_pct": 20.0,
+            "length_m": 1.016,
+            "diameter_m": 0.201,
+            "max_temp_c": 45.0,
+            "ph_range": [2.0, 11.0],
+            "max_chlorine_mgL": 0.1,
+            "max_sdi_15": 5.0,
+            "sigma": {
+                "Na":   0.480,  "K":   0.480,  "Cl":  0.480,
+                "NO3":  0.430,  "F":   0.480,  "NH4": 0.480,
+                "Ca":   0.850,  "Mg":  0.850,  "Sr":  0.850,
+                "Ba":   0.850,  "Fe":  0.850,  "Mn":  0.850,
+                "SO4":  0.975,  "PO4": 0.975,
+                "HCO3": 0.500,
+                "SiO2": 0.150,  "B":   0.150,  "Al":  0.480,
+            },
+            "nf_ps": {
+                "Na":   3.50e-7, "K":   3.50e-7, "Cl":  3.50e-7,
+                "NO3":  3.90e-7, "F":   3.50e-7, "NH4": 3.50e-7,
+                "Ca":   1.80e-7, "Mg":  1.80e-7, "Sr":  1.80e-7,
+                "Ba":   1.80e-7, "Fe":  1.80e-7, "Mn":  1.80e-7,
+                "SO4":  2.20e-8, "PO4": 2.20e-8,
+                "HCO3": 2.80e-7,
+                "SiO2": 8.00e-7, "B":   8.00e-7, "Al":  3.50e-7,
+            }
+        },
+        "NF90-400": {
+            "type": "NF",
+            "manufacturer": "DuPont",
+            "description": "Tight NF membrane; near-RO performance, high divalent and significant monovalent rejection. FilmTec NF90-400/34i.",
+            "active_area_m2": 37.2,
+            "permeability_A": 2.50,       # L/m²/h/bar @ 25°C — spec Table 3 (corrected from 4.5)
+            "permeability_B": 8.00e-8,    # Ps_NaCl as B proxy (m/s)
+            "E_Aw_over_R": 2640,          # Activation energy / R (K) — spec Table 3
+            "feed_spacer_mil": 34,
+            "max_pressure_bar": 41.0,
+            "max_feed_flow_m3h": 15.9,
+            "min_conc_flow_m3h": 0.9,
+            "max_recovery_pct": 20.0,
+            "length_m": 1.016,
+            "diameter_m": 0.201,
+            "max_temp_c": 45.0,
+            "ph_range": [2.0, 11.0],
+            "max_chlorine_mgL": 0.1,
+            "max_sdi_15": 5.0,
+            "sigma": {
+                "Na":   0.870,  "K":   0.870,  "Cl":  0.870,
+                "NO3":  0.820,  "F":   0.870,  "NH4": 0.870,
+                "Ca":   0.950,  "Mg":  0.950,  "Sr":  0.950,
+                "Ba":   0.950,  "Fe":  0.950,  "Mn":  0.950,
+                "SO4":  0.995,  "PO4": 0.995,
+                "HCO3": 0.780,
+                "SiO2": 0.200,  "B":   0.200,  "Al":  0.870,
+            },
+            "nf_ps": {
+                "Na":   8.00e-8, "K":   8.00e-8, "Cl":  8.00e-8,
+                "NO3":  7.50e-8, "F":   8.00e-8, "NH4": 8.00e-8,
+                "Ca":   4.00e-8, "Mg":  4.00e-8, "Sr":  4.00e-8,
+                "Ba":   4.00e-8, "Fe":  4.00e-8, "Mn":  4.00e-8,
+                "SO4":  5.00e-9, "PO4": 5.00e-9,
+                "HCO3": 9.00e-8,
+                "SiO2": 6.00e-7, "B":   6.00e-7, "Al":  8.00e-8,
             }
         },
         "HPA-4040": {
@@ -830,7 +920,25 @@ class MembraneDatabase:
 
     @classmethod
     def list_ro_membranes(cls):
-        return [{"id": k, "name": k, "type": v["type"], "area": v["active_area_m2"]} for k, v in cls.RO_MEMBRANES.items()]
+        return [
+            {
+                "id": k,
+                "name": k,
+                "type": v.get("type"),
+                "manufacturer": v.get("manufacturer"),
+                "area": v.get("active_area_m2"),
+                "feed_spacer_mil": v.get("feed_spacer_mil"),
+                "nominal_rejection": v.get("nominal_rejection"),
+                "max_pressure_bar": v.get("max_pressure_bar"),
+                "max_feed_flow_m3h": v.get("max_feed_flow_m3h"),
+                "min_conc_flow_m3h": v.get("min_conc_flow_m3h"),
+                "max_recovery_pct": v.get("max_recovery_pct"),
+                "length_m": v.get("length_m"),
+                "diameter_m": v.get("diameter_m"),
+                "material": v.get("material", "Polyamide Composite")
+            }
+            for k, v in cls.RO_MEMBRANES.items()
+        ]
 
     @classmethod
     def list_uf_modules(cls):

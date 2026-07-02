@@ -1,0 +1,155 @@
+<!-- Permionics PACE Membrane Vessel Loader -->
+<!-- A realistic membrane pressure-vessel loader: white body, steel end flanges, black hose-clamp straps,
+     Permionics brand label, and a central sight-glass window showing wavy liquid flow left to right. -->
+<!-- For a true progress-driven version (instead of looping), see the JS notes at the bottom. -->
+
+<div class="pace-loader" role="status" aria-live="polite" aria-label="Loading">
+  <svg class="pace-loader__svg" width="320" height="135" viewBox="0 0 440 180">
+    <title>Permionics membrane vessel loader</title>
+
+    <defs>
+      <linearGradient id="pace-vessel-body" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#FFFFFF"/>
+        <stop offset="55%" stop-color="#F3F4F6"/>
+        <stop offset="100%" stop-color="#E2E4E8"/>
+      </linearGradient>
+      <linearGradient id="pace-flange-metal" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#E5E8EB"/>
+        <stop offset="50%" stop-color="#AEB4BC"/>
+        <stop offset="100%" stop-color="#7C828B"/>
+      </linearGradient>
+      <linearGradient id="pace-strap-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#3A3F49"/>
+        <stop offset="100%" stop-color="#13151A"/>
+      </linearGradient>
+      <clipPath id="pace-window-clip">
+        <rect class="pace-clipfill" x="267" y="74" width="0" height="22" rx="3"/>
+      </clipPath>
+    </defs>
+
+    <ellipse cx="53" cy="85" rx="13" ry="32" fill="url(#pace-flange-metal)" stroke="#5B6470" stroke-width="1"/>
+    <circle cx="53" cy="60" r="2" fill="#4B515A"/>
+    <circle cx="53" cy="110" r="2" fill="#4B515A"/>
+    <circle cx="46" cy="85" r="2" fill="#4B515A"/>
+    <circle cx="60" cy="85" r="2" fill="#4B515A"/>
+
+    <rect x="55" y="55" width="320" height="60" rx="30" fill="url(#pace-vessel-body)" stroke="#C7CBD1" stroke-width="1.2"/>
+    <path d="M 65 62 Q 215 53 365 62" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+
+    <ellipse cx="377" cy="85" rx="13" ry="32" fill="url(#pace-flange-metal)" stroke="#5B6470" stroke-width="1"/>
+    <circle cx="377" cy="60" r="2" fill="#4B515A"/>
+    <circle cx="377" cy="110" r="2" fill="#4B515A"/>
+    <circle cx="370" cy="85" r="2" fill="#4B515A"/>
+    <circle cx="384" cy="85" r="2" fill="#4B515A"/>
+
+    <g>
+      <rect x="90" y="53" width="11" height="64" rx="4" fill="url(#pace-strap-grad)"/>
+      <rect x="92" y="53" width="2.5" height="64" rx="1.2" fill="#5A5F68" opacity="0.5"/>
+    </g>
+    <g>
+      <rect x="245" y="53" width="11" height="64" rx="4" fill="url(#pace-strap-grad)"/>
+      <rect x="247" y="53" width="2.5" height="64" rx="1.2" fill="#5A5F68" opacity="0.5"/>
+    </g>
+    <g>
+      <rect x="345" y="53" width="11" height="64" rx="4" fill="url(#pace-strap-grad)"/>
+      <rect x="347" y="53" width="2.5" height="64" rx="1.2" fill="#5A5F68" opacity="0.5"/>
+    </g>
+
+    <g>
+      <rect x="112" y="70" width="122" height="30" rx="6" fill="#FFFFFF" stroke="#D7DBE0" stroke-width="1"/>
+      <path d="M 122 89 A 9 9 0 1 1 131 80" fill="none" stroke="#1E3FA0" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M 128 77 L 132 80 L 128 84" fill="none" stroke="#1E3FA0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="141" y="89" font-size="13" font-weight="600" fill="#1E3FA0" font-family="Arial, sans-serif">PERMIONICS</text>
+    </g>
+
+    <rect x="264" y="71" width="76" height="28" rx="5" fill="#0B1A2E" stroke="#AEB4BC" stroke-width="1.6"/>
+    <g clip-path="url(#pace-window-clip)">
+      <rect x="267" y="74" width="58" height="22" fill="#1E6FC4"/>
+      <g class="pace-wave-back" opacity="0.5">
+        <path d="M260,77 Q266,73 272,77 T284,77 T296,77 T308,77 T320,77 T332,77 T344,77 L344,86 L260,86 Z" fill="#3C8DDE"/>
+      </g>
+      <g class="pace-wave-top" opacity="0.8">
+        <path d="M258,76 Q262,74 266,76 T274,76 T282,76 T290,76 T298,76 T306,76 T314,76 T322,76 T330,76 T338,76 L338,78 Q334,77 330,78 T314,78 T298,78 T282,78 T266,78 L258,78 Z" fill="#9ED4F7"/>
+      </g>
+    </g>
+  </svg>
+
+  <div class="pace-loader__label">Processing membrane projection&hellip;</div>
+</div>
+
+<style>
+.pace-loader{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  padding:20px;
+  background:#F4F7FB;
+  border-radius:12px;
+  font-family:'Inter','Segoe UI',sans-serif;
+}
+
+.pace-loader__label{
+  font-size:11px;
+  font-weight:500;
+  color:#185FA5;
+  letter-spacing:0.3px;
+}
+
+.pace-clipfill{
+  animation:pace-fillgrow 2.6s cubic-bezier(.4,0,.2,1) infinite;
+}
+@keyframes pace-fillgrow{
+  0%{ width:0px; }
+  70%{ width:58px; }
+  100%{ width:58px; }
+}
+
+.pace-wave-back{
+  animation:pace-wavescroll1 1.1s linear infinite;
+}
+.pace-wave-top{
+  animation:pace-wavescroll2 0.8s linear infinite;
+}
+@keyframes pace-wavescroll1{
+  0%{ transform:translateX(0); }
+  100%{ transform:translateX(-24px); }
+}
+@keyframes pace-wavescroll2{
+  0%{ transform:translateX(0); }
+  100%{ transform:translateX(-16px); }
+}
+
+.pace-loader--overlay{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(244,247,251,0.92);
+}
+.pace-loader--overlay.is-active{
+  display:flex;
+}
+</style>
+
+<!--
+PROGRESS-DRIVEN VERSION (recommended for real API calls):
+Instead of the looping CSS animation, drive the sight-glass fill with actual progress (0-100):
+
+  function setPaceLoaderProgress(percent) {
+    const clipRect = document.querySelector('.pace-clipfill');
+    const waveBack = document.querySelector('.pace-wave-back');
+    const waveTop = document.querySelector('.pace-wave-top');
+
+    clipRect.style.animation = 'none';
+    clipRect.setAttribute('width', (58 * percent) / 100);
+
+    waveBack.style.animation = 'pace-wavescroll1 1.1s linear infinite';
+    waveTop.style.animation = 'pace-wavescroll2 0.8s linear infinite';
+  }
+
+Call setPaceLoaderProgress(value) as your calculation engine reports progress,
+or fake a smooth ramp with setInterval if you only have a start/end event.
+-->

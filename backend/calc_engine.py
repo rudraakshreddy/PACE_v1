@@ -54,15 +54,22 @@ class ROEngine:
         pi = total_molarity * self.R_gas * temp_k * phi
         return pi
         
-    def _calculate_tcf(self, temp_c: float) -> float:
-        """Temperature Correction Factor for water permeability"""
-        temp_k = temp_c + 273.15
-        # Exponent selections based on temperature reference:
-        # U = 2640 for T <= 25°C, U = 3020 for T > 25°C
-        U = 2640.0 if temp_c <= 25.0 else 3020.0
-        return math.exp(U * (1.0/298.0 - 1.0/temp_k))
+    def _calculate_tcf(self, temp_c: float, E_Aw_over_R: float = None) -> float:
+        """Temperature Correction Factor for water permeability.
         
-    def _calculate_cp_beta(self, flux_lmh: float, feed_flow_m3h: float, conc_flow_m3h: float, temp_c: float, membrane: Dict[str, Any]) -> float:
+        For NF membranes, uses membrane-specific E_Aw/R from the database (spec eq. NF-W-02).
+        For RO membranes, falls back to the legacy PACE U=2640/3020 values.
+        """
+        temp_k = temp_c + 273.15
+        if E_Aw_over_R is not None:
+            # NF-W-02: TCF_A(T) = exp(E_Aw/R × (1/T_ref − 1/T))  — T_ref = 298.15 K
+            U = E_Aw_over_R
+        else:
+            # Legacy RO correction factor (U = 2640 for T ≤ 25°C, U = 3020 for T > 25°C)
+            U = 2640.0 if temp_c <= 25.0 else 3020.0
+        return math.exp(U * (1.0/298.15 - 1.0/temp_k))
+        
+    def _calculate_cp_beta(self, flux_lmh: float, feed_flow_m3h: float, conc_flow_m3h: float, temp_c: float, membrane: Dict[str, Any], feed_ions: Dict[str, float] = None) -> float:
         """
         Calculate Concentration Polarization factor (Beta = Cm/Cb) using film theory and the Schock-Miquel mass transfer correlation:
         Sh = 0.04 * Re^0.75 * Sc^0.33
@@ -99,7 +106,26 @@ class ROEngine:
         
         # Diffusivity of solute (m2/s) corrected for temperature using Stokes-Einstein
         mu_25 = 1.0e-3 * math.exp(1808.0 / 298.15 - 6.354)
-        D_AB_25 = 1.6e-9 # m2/s
+        D_AB_25 = 1.6e-9 # m2/s default
+        
+        # Ion-specific diffusivities for Pass 2 (Optional Fix 2)
+        if feed_ions is not None:
+            D_AB_ions = {
+                'Na':   1.33e-9,
+                'Cl':   2.03e-9,
+                'Ca':   0.79e-9,
+                'Mg':   0.71e-9,
+                'SO4':  1.07e-9,
+                'HCO3': 1.19e-9,
+                'K':    1.96e-9,
+                'B':    1.10e-9,
+                'NO3':  1.90e-9,
+            }
+            total_conc = sum(feed_ions.values())
+            if total_conc >= 1.0:
+                weighted = sum(conc * D_AB_ions.get(ion, 1.6e-9) for ion, conc in feed_ions.items())
+                D_AB_25 = weighted / total_conc
+        
         D_AB = D_AB_25 * (temp_c + 273.15) / 298.15 * (mu_25 / mu_T)
         
         # Schmidt number Sc
@@ -162,22 +188,35 @@ class ROEngine:
                          feed_ions: Dict[str, float],
                          temp_c: float,
                          membrane: Dict[str, Any],
-                         element_idx: int) -> Dict[str, Any]:
+                         element_idx: int,
+                         beta_cap: float = 1.25,
+                         max_flux_lmh: float = None,
+                         A_override: float = None,
+                         B_override: float = None) -> Dict[str, Any]:
         """
         Simulate a single RO/NF element performance.
         Self-consistent mass-balanced solver for flux and permeate concentration.
+        
+        A_override, B_override: if provided, use these aged values instead of
+        the membrane database values (for aging engine integration).
         """
         # Initial guesses
         recovery = 0.10
         perm_flow_m3h = feed_flow_m3h * recovery
         conc_flow_m3h = feed_flow_m3h - perm_flow_m3h
         
-        A = membrane["permeability_A"]
-        B = membrane["permeability_B"]
+        A = A_override if A_override is not None else membrane["permeability_A"]
+        B = B_override if B_override is not None else membrane["permeability_B"]
         area = membrane["active_area_m2"]
         sigmas = membrane.get("sigma", {})
-        
-        tcf = self._calculate_tcf(temp_c)
+
+        # NF-specific transport: detect membrane type and extract Ps dict + E_Aw/R
+        is_nf = membrane.get("type", "").upper() == "NF"
+        nf_ps_dict = membrane.get("nf_ps", {})       # per-ion Ps (m/s) — NF only
+        E_Aw_over_R = membrane.get("E_Aw_over_R")    # None for RO → legacy U fallback
+
+        # NF-W-02: membrane-specific TCF for NF; legacy formula for RO
+        tcf = self._calculate_tcf(temp_c, E_Aw_over_R)
         
         # Iterative loop to converge on permeate flow and pressure
         max_iter = 20
@@ -195,10 +234,11 @@ class ROEngine:
         for i in range(max_iter):
             # Estimate permeate flow -> flux
             flux_lmh = (current_perm_flow * 1000.0) / area
+
             
             # Calculate CP Beta
-            beta_actual = self._calculate_cp_beta(flux_lmh, feed_flow_m3h, conc_flow_m3h, temp_c, membrane)
-            beta_calc = min(beta_actual, 1.25)
+            beta_actual = self._calculate_cp_beta(flux_lmh, feed_flow_m3h, conc_flow_m3h, temp_c, membrane, feed_ions)
+            beta_calc = min(beta_actual, beta_cap)
             
             # Ratio r = Qp / (2 * Qc)
             r = current_perm_flow / (2.0 * max(0.001, feed_flow_m3h - current_perm_flow))
@@ -213,8 +253,15 @@ class ROEngine:
                     surface_ions[ion] = 0.0
                     continue
                     
-                sigma = sigmas.get(ion, 0.99)
-                P_s_ms = B * (1.0 - sigma) / 0.01 
+                sigma = sigmas.get(ion, 0.99 if not is_nf else 0.347)
+
+                # NF-S-01/NF-S-02: use explicit Ps from nf_ps database for NF membranes.
+                # For RO membranes, derive Ps from B and sigma (legacy formula).
+                if is_nf:
+                    # Use database Ps directly; fall back to Group 3 (monovalent) default
+                    P_s_ms = nf_ps_dict.get(ion, 5.80e-7)
+                else:
+                    P_s_ms = B * (1.0 - sigma) / 0.01
                 P_s_mh = P_s_ms * 3600.0
                 
                 jv_mh = flux_lmh / 1000.0
@@ -268,6 +315,9 @@ class ROEngine:
                 
             # Calculate new flux
             new_flux_lmh = A * ndp * tcf
+            if max_flux_lmh is not None:
+                new_flux_lmh = min(new_flux_lmh, max_flux_lmh)
+                
             new_perm_flow = (new_flux_lmh * area) / 1000.0
             
             # Update flows
@@ -299,6 +349,33 @@ class ROEngine:
                 rej_ions[ion] = max(0.0, rej_c)
             else:
                 rej_ions[ion] = 0.0
+
+        # --- Donnan Electroneutrality Correction for NF (spec Section 3.6) ---
+        # NF membranes selectively reject divalent anions (SO4) over monovalent anions (Cl).
+        # This creates a charge imbalance in the permeate. Cl- is adjusted to ensure
+        # electroneutrality: sum(cation meq) = sum(anion meq including Cl).
+        if is_nf and feed_ions.get("Cl", 0) > 0 and perm_flow_m3h > 0:
+            _cat_mw_z = {"Ca": (40.078, 2), "Mg": (24.305, 2), "Na": (22.990, 1),
+                         "K":  (39.098, 1), "Ba": (137.327, 2), "Sr": (87.62, 2),
+                         "NH4": (18.04, 1), "Fe": (55.845, 2), "Mn": (54.938, 2),
+                         "Al": (26.982, 3)}
+            _an_mw_z  = {"SO4": (96.06, 2), "HCO3": (61.017, 1), "NO3": (62.00, 1),
+                         "F":   (18.998, 1), "PO4": (94.97, 3)}
+            sum_cat_meq = sum(perm_ions.get(ion, 0) / mw * z
+                             for ion, (mw, z) in _cat_mw_z.items())
+            sum_an_meq  = sum(perm_ions.get(ion, 0) / mw * z
+                             for ion, (mw, z) in _an_mw_z.items())
+            cl_required_meq = sum_cat_meq - sum_an_meq
+            cl_perm_donnan = max(0.0, cl_required_meq * 35.45)  # meq/L → mg/L
+            # Physical cap: Cl permeate cannot exceed feed Cl concentration
+            cl_perm_donnan = min(cl_perm_donnan, feed_ions.get("Cl", 0) * 1.05)
+            if cl_perm_donnan > 0:
+                perm_ions["Cl"] = cl_perm_donnan
+                # Recompute concentrate Cl via mass balance
+                if conc_flow_m3h > 0:
+                    mass_cl_in   = feed_flow_m3h * feed_ions.get("Cl", 0)
+                    mass_cl_perm = perm_flow_m3h * cl_perm_donnan
+                    rej_ions["Cl"] = max(0.0, (mass_cl_in - mass_cl_perm) / conc_flow_m3h)
                 
         return {
             "element_idx": element_idx,
@@ -325,10 +402,17 @@ class ROEngine:
                         membrane_model: str,
                         stages: int,
                         vessels_per_stage: List[int],
-                        elements_per_vessel: int) -> Dict[str, Any]:
+                        elements_per_vessel: int,
+                        beta_cap: float = 1.25,
+                        max_flux_lmh: float = None,
+                        aged_params: Dict = None) -> Dict[str, Any]:
         """
         Simulate an entire RO/NF array with interstage booster pump calculations.
         vessels_per_stage: e.g., [4, 2] for a 2-stage system
+        
+        aged_params: optional dict keyed by (stage, element) tuples containing
+        {"A": float, "B": float, "dh": float} for aged membrane simulation.
+        If provided, element-wise A and B are overridden from this dict.
         """
         membrane = MembraneDatabase.get_ro_membrane(membrane_model)
         
@@ -380,9 +464,19 @@ class ROEngine:
                         "value": vessel_current_flow
                     })
 
+                # Apply aged parameter overrides if provided
+                a_ovr = None
+                b_ovr = None
+                if aged_params:
+                    key = (stage_idx + 1, elem_idx + 1)
+                    if key in aged_params:
+                        a_ovr = aged_params[key].get("A")
+                        b_ovr = aged_params[key].get("B")
+
                 res = self.simulate_element(
                     vessel_current_flow, vessel_current_pressure, vessel_current_ions,
-                    temp_c, membrane, global_elem_idx
+                    temp_c, membrane, global_elem_idx, beta_cap, max_flux_lmh,
+                    A_override=a_ovr, B_override=b_ovr
                 )
                 
                 # Check feed pressure limit
@@ -408,7 +502,7 @@ class ROEngine:
                 beta_val = res["beta"]
                 if beta_val >= 1.20:
                     system_results["warnings"].append({
-                        "type": f"Polarization Beta > 1.20 (S{stage_idx+1}-E{elem_idx+1})",
+                        "type": f"Concentration Polarization (\u03b2) > 1.20 (S{stage_idx+1}-E{elem_idx+1})",
                         "element": f"S{stage_idx+1}-E{elem_idx+1}",
                         "limit": 1.20,
                         "value": beta_val

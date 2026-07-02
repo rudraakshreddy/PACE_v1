@@ -1,0 +1,82 @@
+PACE Membrane Recommendation Algorithm
+Specification Document — Permionics HPA 4040 Series
+Version 1.0 | June 2026
+1. Introduction
+This document specifies the membrane recommendation algorithm implemented in the PACE (Process Architecture & Calculation Engine) Calculation Module. The algorithm automatically selects the optimal Permionics RO/NF membrane model based on user-provided feed water characteristics, target permeate quality, system configuration, and water source type.
+The algorithm is specifically designed around the Permionics HPA 4040 membrane series and uses the manufacturer's datasheet specifications — including design flux guidelines by water source and operating limits — as the primary selection criteria.
+2. Permionics HPA 4040 Specifications
+2.1 Performance Data
+Test conditions: 2000 ppm NaCl, 225 psig (15.5 bar), 25°C, 15% recovery.
+2.2 Operating Limits
+2.3 Design Flux Guidelines by Water Source
+The following flux guidelines are specified by the manufacturer for different water sources. Operating within these ranges ensures sustainable long-term performance and warranty compliance.
+2.4 Saturation Limits
+3. Recommendation Algorithm
+3.1 Overview
+The algorithm uses a multi-criteria weighted scoring system that evaluates each Permionics membrane in the database against the user's feed water and system requirements. The membrane with the highest total score is recommended. Membranes that violate hard operating limits are disqualified regardless of score.
+The total score is computed as the sum of 5 independent criteria:
+Total Score = Σ (all criteria) out of 100 points
+3.2 Criterion 1 — Rejection Capability (30 pts)
+This criterion evaluates whether the membrane can produce permeate with TDS at or below the user's target. It uses the nominal and minimum rejection values from the datasheet.
+Estimated permeate TDS (single-pass):
+  C_permeate = C_feed × (1 − R_nominal)
+  C_permeate_worst = C_feed × (1 − R_min)
+3.3 Criterion 2 — Feed Water Compatibility (20 pts)
+This criterion checks whether the user's feed water falls within the membrane's operating envelope. Violations result in hard disqualification (DQ). Parameters near the limit edges receive partial deductions.
+3.4 Criterion 3 — Design Flux Match (20 pts)
+This criterion uses the manufacturer's design flux guidelines (from the HPA 4040 datasheet, Page 2) to evaluate whether the system's estimated operating flux falls within the recommended range for the given water source and SDI level.
+Flux estimation formula:
+  Estimated Flux = (Feed Flow × Recovery × 1000) / (Total Membrane Area)
+  Total Area = N_vessels × N_elements × A_element
+The water source is mapped to the appropriate flux guideline key:
+Beta (Concentration Polarization) Estimation & Penalty:
+The algorithm estimates the stage-1 average Beta using the Sherwood mass transfer correlation based on the true target recovery and average system conditions. It acts as an indicator of cross-flow velocity vs flux.
+• If Estimated Beta > 1.20, a penalty is applied to the Flux Match score.
+• Penalty = min(30% of Flux Match weight, (Beta - 1.20) × 5.0)
+This softened penalty ensures high-beta configurations trigger a warning (e.g. "Ensure sufficient cross-flow") without improperly disqualifying valid membranes.
+3.5 Criterion 4 — Hydraulic Fit (15 pts)
+This criterion evaluates whether the membrane element size (4040 vs 8040) matches the system's total feed flow rate, and whether vessel-level flow constraints are met.
+Additional deductions:
+• Vessel feed flow exceeds max feed flow: ×0.5 multiplier
+• Estimated concentrate flow below minimum: ×0.7 multiplier
+3.6 Criterion 5 — Fouling & Application Suitability (15 pts)
+This criterion assesses whether the membrane's fouling characteristics and type (BWRO, SWRO, NF) match the application environment.
+4. Decision Flow
+The algorithm executes the following steps in sequence:
+1. Filter the membrane database to Permionics membranes only.
+2. For each candidate membrane, evaluate all 5 scoring criteria.
+3. Check Criterion 2 (Compatibility) for hard disqualification conditions.
+4. Sum scores across all criteria (max 100 points).
+5. Rank membranes by total score (descending).
+6. The highest-scoring non-disqualified membrane is the recommendation.
+7. If all membranes are disqualified, report no suitable membrane found.
+5. Score Interpretation
+6. Worked Examples
+6.1 Example 1: Brackish Well Water
+Input Parameters:
+• Feed TDS: 2000 mg/L, Target TDS: 10 mg/L, Recovery: 75%
+• Feed Flow: 5.0 m³/h, Source: BRACKISH_GW, Temp: 25°C, pH: 7.5, SDI: 2.5
+Results for HPA-4040:
+• Rejection: 21/30 (nominal meets target, worst-case borderline)
+• Compatibility: 20/20 (all within limits)
+• Flux Match: 14/20 (slightly below design range — conservative)
+• Hydraulic Fit: 15/15 (4040 well-suited at 5 m³/h)
+• Application: 15/15 (BWRO matched to brackish source)
+• Total: 85/100 — Excellent match
+6.2 Example 2: Surface Water with High SDI
+Input Parameters:
+• Feed TDS: 1500 mg/L, Target TDS: 20 mg/L, Recovery: 70%
+• Feed Flow: 8.0 m³/h, Source: SURFACE, Temp: 30°C, pH: 8.0, SDI: 4.5
+Results for HPA-4040:
+• Rejection: 30/30 (comfortably meets target)
+• Compatibility: 15/20 (SDI and turbidity near limits → −5)
+• Flux Match: 14/20 (slightly below range)
+• Hydraulic Fit: 15/15 (4040 suitable at 8 m³/h)
+• Application: 15/15 (low-fouling suited for surface water)
+• Total: 89/100 — Excellent match
+6.3 Example 3: Feed Temperature Exceedance
+Input Parameters:
+• Feed TDS: 3000 mg/L, Target TDS: 15 mg/L, Temp: 50°C
+Result: DISQUALIFIED — Feed temperature 50°C exceeds max limit of 45°C.
+7. API Reference
+Endpoint: POST /api/recommend-membrane
