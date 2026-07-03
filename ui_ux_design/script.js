@@ -5230,6 +5230,7 @@ window.renderPhysicsResults = function(data) {
     if (!data || !data.physics_results) return;
     
     const results = data.physics_results;
+    window.lastPhysicsResult = results;   // store for antiscalant-aware SI risk thresholds
     const snapshots = results.annual_snapshots || [];
     const selectedYear = data.physics_selected_year || 0;
     
@@ -5295,7 +5296,7 @@ window.renderPhysicsResults = function(data) {
         }
 
         // NPF
-        setText('phys-card-npf', cur.npf.toFixed(2));
+        setText('phys-card-npf', cur.npf.toFixed(4));
         const npfDelta = document.getElementById('phys-card-npf-delta');
         if (npfDelta) {
             if (selectedYear === 0) {
@@ -5310,8 +5311,8 @@ window.renderPhysicsResults = function(data) {
         }
 
         // FRI, B_Rel, Recovery, TDS, SEC, CIPs
-        setText('phys-card-fri',  cur.fri.toFixed(2));
-        setText('phys-card-brel', cur.b_relative.toFixed(2));
+        setText('phys-card-fri',  cur.fri.toFixed(3));
+        setText('phys-card-brel', cur.b_relative.toFixed(3));
         setText('phys-card-rec',  (cur.recovery * 100).toFixed(1));
         setText('phys-card-tds',  cur.perm_tds.toFixed(1));
         setText('phys-card-sec',  cur.sec_kwh_m3.toFixed(2));
@@ -5332,12 +5333,12 @@ window.renderPhysicsResults = function(data) {
                     <td>${s.feed_pressure_bar.toFixed(1)}</td>
                     <td>${s.perm_tds.toFixed(1)}</td>
                     <td>${s.sec_kwh_m3.toFixed(2)}</td>
-                    <td>${s.npf.toFixed(2)}</td>
-                    <td>${s.nsp.toFixed(2)}</td>
-                    <td>${s.fri.toFixed(2)}</td>
-                    <td>${s.b_relative.toFixed(2)}</td>
-                    <td><span style="padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; background: ${s.cip_triggered ? 'rgba(245, 158, 11, 0.15); color: #fbbf24;' : 'rgba(16, 185, 129, 0.15); color: #34d399;' }">${s.cip_triggered ? 'CIP Needed' : 'Normal'}</span></td>
-                    <td>${s.cip_count}</td>
+                    <td>${s.npf.toFixed(4)}</td>
+                    <td>${s.nsp.toFixed(4)}</td>
+                    <td>${s.fri.toFixed(3)}</td>
+                    <td>${s.b_relative.toFixed(3)}</td>
+                    <td><span style="padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; background: var(--input-bg); color: var(--text-primary); text-transform: capitalize; border: 1px solid var(--input-border);">${s.dominant_mechanism.replace('_', ' ')}</span></td>
+                    <td>${s.ndp_ratio.toFixed(3)}</td>
                 </tr>
             `;
         }).join('');
@@ -5351,18 +5352,19 @@ window.renderPhysicsResults = function(data) {
     const foulingLabel = document.getElementById('phys-fouling-year-label');
     if (foulingLabel) foulingLabel.innerText = `Year ${selectedYear}`;
     if (foulTbody && cur && base) {
-        const totalR = (cur.rc_avg || 0) + (cur.rb_avg || 0) + (cur.rs_avg || 0) + (cur.rn_avg || 0) + (cur.rcomp || 0);
+        const totalR = (cur.rc_avg || 0) + (cur.rb_avg || 0) + (cur.rs_avg || 0) + (cur.rn_avg || 0);
         const mechanisms = [
-            { name: "Particulate/Cake (Rc)", val: cur.rc_avg || 0 },
-            { name: "Biofouling (Rb)", val: cur.rb_avg || 0 },
-            { name: "Scaling (Rs)", val: cur.rs_avg || 0 },
-            { name: "Organic/NOM (Rn)", val: cur.rn_avg || 0 },
-            { name: "Compaction (Rcomp)", val: cur.rcomp || 0 }
+            { name: "Particulate/Cake (Rc)", val: cur.rc_avg || 0, isFoul: true },
+            { name: "Biofouling (Rb)", val: cur.rb_avg || 0, isFoul: true },
+            { name: "Scaling (Rs)", val: cur.rs_avg || 0, isFoul: true },
+            { name: "Organic/NOM (Rn)", val: cur.rn_avg || 0, isFoul: true },
+            { name: "Compaction (Structural)", val: cur.rcomp || 0, isFoul: false }
         ];
         foulTbody.innerHTML = mechanisms.map(m => {
-            const pct = totalR > 0 ? (m.val / totalR) * 100 : 0;
-            const status = pct > 40 ? '<span style="color:#ef4444;font-weight:bold;">Critical</span>' : (pct > 20 ? '<span style="color:#f59e0b;font-weight:bold;">Elevated</span>' : '<span style="color:#10b981;">Normal</span>');
-            return `<tr><td>${m.name}</td><td>${m.val.toExponential(2)}</td><td>${pct.toFixed(1)}%</td><td>${status}</td></tr>`;
+            const pct = (m.isFoul && totalR > 0) ? (m.val / totalR) * 100 : null;
+            const status = m.isFoul ? (pct > 40 ? '<span style="color:#ef4444;font-weight:bold;">Critical</span>' : (pct > 20 ? '<span style="color:#f59e0b;font-weight:bold;">Elevated</span>' : '<span style="color:#10b981;">Normal</span>')) : '<span style="color:#64748b;">N/A</span>';
+            const pctStr = pct !== null ? pct.toFixed(1) + '%' : 'N/A';
+            return `<tr><td>${m.name}</td><td>${m.val.toExponential(2)}</td><td>${pctStr}</td><td>${status}</td></tr>`;
         }).join('');
     }
 
@@ -5371,16 +5373,39 @@ window.renderPhysicsResults = function(data) {
     const siLabel = document.getElementById('phys-si-year-label');
     if (siLabel) siLabel.innerText = `Year ${selectedYear}`;
     if (siTbody && cur && base) {
+        // Antiscalant-aware industry-standard SI limits (Filmtec/Hydranautics design guidelines)
+        // limit     = threshold without antiscalant  (strict, thermodynamic precipitation onset)
+        // limitAS   = threshold with antiscalant     (vendor-approved operating envelope)
+        // caution   = low-risk buffer below limit     (early warning zone)
+        const antiscalantOn = (window.lastPhysicsResult && window.lastPhysicsResult.antiscalant_dosed) ? true : false;
         const minerals = [
-            { name: "Calcite", bulk: cur.si_calcite_bulk, yr0: base.si_calcite_wall || 0, cur: cur.si_calcite_wall || 0, limit: 1.5 },
-            { name: "Gypsum", bulk: cur.si_gypsum_bulk, yr0: base.si_gypsum_wall || 0, cur: cur.si_gypsum_wall || 0, limit: 0.0 },
-            { name: "Barite", bulk: cur.si_barite_bulk, yr0: base.si_barite_wall || 0, cur: cur.si_barite_wall || 0, limit: 0.0 },
-            { name: "Silica", bulk: cur.si_silica_bulk, yr0: base.si_silica_wall || 0, cur: cur.si_silica_wall || 0, limit: 0.0 }
+            { name: "Calcite (CaCO₃)", bulk: cur.si_calcite_bulk, yr0: base.si_calcite_wall || 0, cur: cur.si_calcite_wall || 0,
+              limit: 0.0, limitAS: 0.5, caution: -0.2,
+              note: "LSI threshold: 0.0 (no AS), +0.5 (with antiscalant)" },
+            { name: "Gypsum (CaSO₄)", bulk: cur.si_gypsum_bulk, yr0: base.si_gypsum_wall || 0, cur: cur.si_gypsum_wall || 0,
+              limit: 0.0, limitAS: 0.0, caution: -0.2,
+              note: "Threshold: SI = 0.0 (antiscalant provides kinetic delay only)" },
+            { name: "Barite (BaSO₄)", bulk: cur.si_barite_bulk, yr0: base.si_barite_wall || 0, cur: cur.si_barite_wall || 0,
+              limit: -0.3, limitAS: 0.0, caution: -0.5,
+              note: "Barite is irreversible — conservative limit below 0.0" },
+            { name: "Amorphous Silica", bulk: cur.si_silica_bulk, yr0: base.si_silica_wall || 0, cur: cur.si_silica_wall || 0,
+              limit: 0.0, limitAS: 0.2, caution: -0.1,
+              note: "Silica threshold: 0.0 (no AS), +0.2 (with antiscalant)" }
         ];
         siTbody.innerHTML = minerals.map(m => {
-            const status = m.cur > m.limit ? '<span style="color:#ef4444;font-weight:bold;">High Risk</span>' : '<span style="color:#10b981;">Low Risk</span>';
+            const activeLimit   = antiscalantOn ? m.limitAS : m.limit;
+            const cautionLimit  = antiscalantOn ? m.caution + (m.limitAS - m.limit) : m.caution;
+            let status;
+            if (m.cur >= activeLimit) {
+                status = '<span style="color:#ef4444;font-weight:bold;">⚠ High Risk</span>';
+            } else if (m.cur >= cautionLimit) {
+                status = '<span style="color:#f59e0b;font-weight:bold;">⚡ Caution</span>';
+            } else {
+                status = '<span style="color:#10b981;">✓ Low Risk</span>';
+            }
             const bulkVal = typeof m.bulk === 'number' ? m.bulk.toFixed(2) : '--';
-            return `<tr><td>${m.name}</td><td>${bulkVal}</td><td>${m.yr0.toFixed(2)}</td><td><strong>${m.cur.toFixed(2)}</strong></td><td>${status}</td></tr>`;
+            const limitStr = antiscalantOn ? `${m.limitAS.toFixed(1)} (AS)` : `${m.limit.toFixed(1)}`;
+            return `<tr title="${m.note}"><td>${m.name}</td><td>${bulkVal}</td><td>${m.yr0.toFixed(2)}</td><td><strong>${m.cur.toFixed(2)}</strong></td><td>${limitStr}</td><td>${status}</td></tr>`;
         }).join('');
     }
 };
@@ -5426,7 +5451,11 @@ window.renderPhysicsCharts = function(snapshots) {
                     y: {
                         beginAtZero: false,
                         grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' }
+                        ticks: {
+                            color: '#94a3b8',
+                            // Show 4 decimal places so small NPF/NSP changes are visible
+                            callback: (v) => v.toFixed(4)
+                        }
                     },
                     x: {
                         grid: { display: false },
@@ -5436,6 +5465,11 @@ window.renderPhysicsCharts = function(snapshots) {
                 plugins: {
                     legend: {
                         labels: { color: '#e2e8f0', font: { size: 10 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}`
+                        }
                     }
                 }
             }

@@ -600,6 +600,9 @@ class SystemEngine:
             c_r_prev = c_r_new
             q_p_prev = q_p
 
+        # 8. Add recycle metrics
+        fresh_flow = input_data["target_flow_m3h"]
+
         # 8. Augment the baseline final_result with recycle metadata
         if result:
             q_p_final = 0

@@ -50,10 +50,10 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
     "TMP_ref":     10.0,      # reference TMP [bar]
 
     # Biofouling (Sub-model II)
-    "mu_max":      0.05,      # max specific growth rate [h⁻¹]
+    "mu_max":      0.05,      # max specific growth rate [h⁻¹]  (literature: 0.01-0.05 h-1 for RO plant community)
     "BDOC":        0.5,       # biodegradable DOC [mg/L] (overridden from TOC)
     "Ks":          2.0,       # Monod half-saturation [mg/L]
-    "bd":          0.01,      # decay + detachment [h⁻¹]
+    "bd":          0.01,      # decay + detachment [h⁻¹]  (literature: 0.005-0.01 h-1 for oligotrophic biofilm)
     "Ea_bio":      40000.0,   # activation energy [J/mol]
     "T_ref_bio":   298.15,    # reference T [K]
     "Jb_seed":     1.0e-9,    # seeding flux [m/h]
@@ -61,13 +61,14 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
     "eps_bf":      0.70,      # biofilm porosity
     "tau_bf":      2.0,       # tortuosity
     "Lb_min":      1.0e-6,    # min biofilm thickness for EOP [m]
+    "Lb_max":      1.5e-4,    # carrying capacity: 150 µm  (Vrouwenvelder 2010 CLSM autopsy: 50-150 µm on RO membranes)
 
     # Scaling CNT (Sub-model III) – Calcite defaults
     "gamma_sl":    0.034,     # solid-liquid interfacial energy [J/m²]
     "theta_contact": 40.0,   # contact angle [degrees]
-    "A_ind":       1.0e8,     # pre-exponential nucleation [s]
+    "A_ind":       1.0e3,     # pre-exponential nucleation [s]
     "Vm_calcite":  3.69e-5,   # molar volume [m³/mol]
-    "kg_calcite":  2.0e-8,    # crystal growth rate [m/(s·(mol/m³)²)]
+    "kg_calcite":  3.5e-13,   # crystal growth rate [m/s] calibrated for (S-1)^2 driving force
     "ns_calcite":  2.0,       # growth order
     "alpha_scale": 2.0e13,    # specific scale resistance [m/kg]
     "rho_calcite": 2710.0,    # mineral density [kg/m³]
@@ -95,7 +96,7 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
     "kd_acid":     1.3e-4,    # acid dissolution rate [m/(s·M)]
     "Ea_dis":      35000.0,   # activation energy calcite dissolution [J/mol]
     "cip_ph_acid": 2.5,       # acid CIP pH
-    "kd_bio":      4.0e-3,    # biofilm alkaline removal [m/(s·M)]
+    "kd_bio":      1.9e-2,    # biofilm alkaline removal [m/(s·M)] — calibrated for 85% removal at pH 11.5
     "kd_NOM":      6.0e-3,    # NOM alkaline hydrolysis [m/(s·M)]
     "Ea_bio_rem":  38000.0,   # activation energy biofilm removal [J/mol]
     "cip_ph_alk":  11.5,      # alkaline CIP pH
@@ -133,11 +134,13 @@ DEFAULT_PHYSICS_PARAMS.update({
     "Cb":          0.005,        # bulk particle conc [kg/m³]
     "alpha0":      5.0e11,       # specific cake resistance at ref TMP [m/kg]
 
-    # Biofouling (Sub-model II) — calibrated for months-to-years growth
-    "mu_max":      7.5e-4,       # max specific growth rate [h⁻¹] (5× previous, still realistic)
+    # Biofouling (Sub-model II) — calibrated for realistic RO plant community
+    # Literature (Bereschenko 2010, Vrouwenvelder 2010): mu_net ~ 0.005-0.04 h-1, doubling ~17h-10 days
+    # Lab P.aeruginosa (Herzberg 2007): mu_max ~ 0.2-0.4 h-1 — NOT appropriate for plant-scale model
+    "mu_max":      0.020,        # h⁻¹ — realistic RO plant community (mid of 0.01-0.05 literature range)
     "BDOC":        0.3,          # biodegradable DOC [mg/L] fraction of TOC
-    "Ks":          0.8,          # half-saturation [mg/L]
-    "bd":          3.0e-5,       # decay + detachment [h⁻¹]
+    "Ks":          0.8,          # half-saturation [mg/L] (oligotrophic RO community has high substrate affinity)
+    "bd":          4.0e-3,       # h⁻¹ — decay/detachment (literature: 0.005-0.01 h-1; lower = more conservative)
     "Jb_seed":     5.0e-12,      # seeding flux [m/h]
     "Ea_bio":      45000.0,      # activation energy [J/mol]
 
@@ -343,16 +346,22 @@ class PhysicsAgingEngine:
         # Compute Year 0 wall SI from baseline CP.
         # At Year 0, membrane is clean (Rm only). Average flux from baseline:
         #   Jw_0 [m/s] from permeate flow / total membrane area
-        _Qp0_m3s = bsum["perm_flow"] / 3600.0  # m3/s
-        _n_elem  = stages * elements_per_vessel
-        _A_total = area_m2 * _n_elem             # total active area [m2]
-        _Jw0     = _Qp0_m3s / max(_A_total, 1e-6)  # m/s
-        # Typical kM for clean membrane at baseline crossflow ~5e-6 m/s
-        _kM0     = 5.0e-6
-        # CP factor = exp(Jw/kM), log10(CP) = Jw/(kM * ln(10))
-        _CP_log10_0 = (_Jw0 / max(_kM0, 1e-9)) / math.log(10)
-        _CP_log10_0 = max(0.0, min(_CP_log10_0, 1.0))  # clamp to physical range
-        # Wall SI = Bulk SI + log10(CP). Use representative bulk concentrate SI values.
+        _Qp0_m3s = bsum["perm_flow"] / 3600.0                         # m3/s
+        _n_elem  = sum(vessels_per_stage) * elements_per_vessel        # total elements in system
+        _elem_area_m2 = area_m2                                        # m²/element from membrane spec
+        _A_total = _elem_area_m2 * _n_elem                             # total active area [m2]
+        _Jw0     = _Qp0_m3s / max(_A_total, 1e-6)                     # [m/s]
+        # kM0 at clean membrane: typical Graetz-Lévêque value for 8" spiral at 5-7 LMH
+        _kM0     = 5.0e-6   # [m/s]
+        # True CP factor: exp(Jw/kM)
+        try:
+            _CP0     = math.exp(min(_Jw0 / max(_kM0, 1e-9), 5.0))
+        except OverflowError:
+            _CP0 = 1.0
+        _CP_log10_0 = math.log10(max(_CP0, 1.0))
+        _CP_log10_0 = max(0.0, min(_CP_log10_0, 0.7))   # physical cap at CP≈5
+        # Wall SI = Bulk SI + log10(CP). All 1:1 electrolytes get same shift.
+
         _si_calc_bulk =  0.50
         _si_gyps_bulk = -1.20
         _si_bari_bulk =  0.10
@@ -390,9 +399,9 @@ class PhysicsAgingEngine:
             "cip_count":            0,
             "dominant_mechanism":   "none",
             "si_calcite_wall":      round(_si_calc_bulk + _CP_log10_0, 3),
-            "si_gypsum_wall":       round(_si_gyps_bulk + _CP_log10_0 * 0.6, 3),
-            "si_barite_wall":       round(_si_bari_bulk + _CP_log10_0 * 0.4, 3),
-            "si_silica_wall":       round(_si_sili_bulk + _CP_log10_0 * 0.3, 3),
+            "si_gypsum_wall":       round(_si_gyps_bulk + _CP_log10_0, 3),
+            "si_barite_wall":       round(_si_bari_bulk + _CP_log10_0, 3),
+            "si_silica_wall":       round(_si_sili_bulk + _CP_log10_0, 3),
             "si_calcite_bulk":      round(self.si_calc_bulk, 3),
             "si_gypsum_bulk":       round(self.si_gyps_bulk, 3),
             "si_barite_bulk":       round(self.si_bari_bulk, 3),
@@ -460,12 +469,20 @@ class PhysicsAgingEngine:
         monthly_profile: List[dict] = []
         # Track previous year-end pressure for monthly interpolation
         P_prev_year_end = P0_bar
+        
+        R_prev_dict = {
+            "cake_colloidal": 0.0,
+            "biofouling":     0.0,
+            "scaling":        0.0,
+            "nom_adsorption": 0.0,
+        }
 
         # Year-loop
         for year in range(1, n_years + 1):
             # ---- Monthly time-stepping within the year ----------------
             months_per_year = 12
             cip_this_year = False
+            _deferred_cip = False   # set if a scheduled CIP falls on the last month of the year
 
             # Cache: store per-month intermediate state for DEFERRED monthly emission.
             # We CANNOT emit monthly pressure until we know P_end_this_year from
@@ -523,16 +540,32 @@ class PhysicsAgingEngine:
                         # RK4 advance (DT_H in hours, ODE in h⁻¹ / h)
                         dt_s = DT_H * 3600.0   # seconds
 
-                        # Cake: ODE in kg/(m²·s)
-                        mc_new     = max(0.0, mc[ei][zi]     + dmc_dt * dt_s)
+                        # Cake: Analytical exact integration to prevent Euler instability
+                        rem_k = self.p["K_rem"] * tau_w
+                        dep_rate = dmc_dt + rem_k * mc[ei][zi]
+                        if rem_k > 1e-12:
+                            mc_ss = dep_rate / rem_k
+                            mc_new = mc_ss + (mc[ei][zi] - mc_ss) * _safe_exp(-rem_k * dt_s, 50.0)
+                        else:
+                            mc_new = mc[ei][zi] + dmc_dt * dt_s
+                        mc_new = max(0.0, mc_new)
+
                         # Biofilm: ODE in m/h → convert
                         Lb_new     = max(0.0, Lb[ei][zi]     + dLb_dt * DT_H)
+                        
                         # Scale: ODE in m/s
                         ds_new     = max(0.0, delta_s[ei][zi] + dds_dt * dt_s)
                         t_SI_new   = t_SI[ei][zi] + dt_SI * DT_H
-                        # NOM: ODE in kg/(m²·s)
-                        q_new      = max(0.0, min(q_nom[ei][zi] + dq_dt * dt_s,
-                                                   self.p["qmax"]))
+                        
+                        # NOM: Analytical exact integration to prevent Euler instability
+                        shear_mod = max(0.1, min(1.0, self.p["tau_w_ref"] / max(tau_w, 1e-6)))
+                        k_eff = self.p["kads"] * shear_mod
+                        if k_eff > 1e-12:
+                            q_eq = (dq_dt / k_eff) + q_nom[ei][zi]
+                            q_new = q_eq + (q_nom[ei][zi] - q_eq) * _safe_exp(-k_eff * dt_s, 50.0)
+                        else:
+                            q_new = q_nom[ei][zi] + dq_dt * dt_s
+                        q_new = max(0.0, min(q_new, self.p["qmax"]))
 
                         mc[ei][zi]      = mc_new
                         Lb[ei][zi]      = Lb_new
@@ -571,19 +604,30 @@ class PhysicsAgingEngine:
                 scheduled_cip = (self.p.get("interval_months", 0) > 0 and
                                  elapsed_months % self.p["interval_months"] == 0)
                 if scheduled_cip:
-                    cip_this_year = True
-                    cip_count_total += 1
-                    cip_events.append((year, f"Scheduled (Month {elapsed_months})"))
-                    mc, Lb, delta_s, q_nom = self._apply_cip(
-                        mc, Lb, delta_s, q_nom, temp_c, n_total_elem
-                    )
-                    for ei in range(n_total_elem):
-                        for zi in range(NZ):
-                            TMP_Pa_approx = P_curr_bar * 1.0e5 * 0.5
-                            Rc_seg[ei][zi] = self._rc(mc[ei][zi], TMP_Pa_approx)
-                            Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
-                            Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
-                            Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
+                    is_year_boundary = (month == 11)   # last month of the year
+                    if is_year_boundary:
+                        # ---- DEFER to after year-end snapshot -------------------
+                        # If we apply here the snapshot sees a just-cleaned membrane
+                        # (FRI ≈ 0, P_feed ≈ baseline) which is wrong. The snapshot
+                        # must represent the actual fouled state at year-end.
+                        # The CIP cleanup will be applied below after snap is taken.
+                        _deferred_cip = True
+                        scheduled_cip = False   # do NOT apply inside the loop
+                    else:
+                        # Mid-year CIP — apply immediately as normal
+                        cip_this_year = True
+                        cip_count_total += 1
+                        cip_events.append((year, f"Scheduled (Month {elapsed_months})"))
+                        mc, Lb, delta_s, q_nom = self._apply_cip(
+                            mc, Lb, delta_s, q_nom, temp_c, n_total_elem
+                        )
+                        for ei in range(n_total_elem):
+                            for zi in range(NZ):
+                                TMP_Pa_approx = P_curr_bar * 1.0e5 * 0.5
+                                Rc_seg[ei][zi] = self._rc(mc[ei][zi], TMP_Pa_approx)
+                                Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
+                                Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
+                                Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
 
                 # ---- Cache this month's FRI state for deferred emission ------
                 Rc_elem_m = [sum(Rc_seg[ei]) / NZ for ei in range(n_total_elem)]
@@ -593,9 +637,10 @@ class PhysicsAgingEngine:
 
                 FRI_list_m = []
                 for ei in range(n_total_elem):
-                    Rf_m = (Rc_elem_m[ei] + Rb_elem_m[ei]
-                            + Rs_elem_m[ei] + Rn_elem_m[ei] + Rcomp_elem[ei])
-                    FRI_list_m.append(Rf_m / (Rm_base + Rf_m + 1e-30))
+                    Rf_foul_m = (Rc_elem_m[ei] + Rb_elem_m[ei]
+                                 + Rs_elem_m[ei] + Rn_elem_m[ei])
+                    Rf_total_m = Rf_foul_m + Rcomp_elem[ei]
+                    FRI_list_m.append(Rf_foul_m / (Rm_base + Rf_foul_m + 1e-30))
                 FRI_avg_m   = sum(FRI_list_m) / n_total_elem
                 B_rel_avg_m = sum(B_rel) / n_total_elem
                 flux_lmh_m  = (sum(
@@ -658,6 +703,28 @@ class PhysicsAgingEngine:
                 )
                 snap["cip_triggered"] = True
                 snap["cip_count"]     = cip_count_total
+
+            # ---- Apply deferred end-of-year scheduled CIP (AFTER snapshot) -----
+            # A scheduled CIP that fell on month 12 was deferred so the snapshot
+            # captures the actual fouled state. Apply it now so the next year starts
+            # from the post-CIP cleaned state.
+            if _deferred_cip:
+                elapsed_deferred = year * 12
+                cip_this_year = True
+                cip_count_total += 1
+                cip_events.append((year, f"Scheduled (Month {elapsed_deferred}) [post-snap]"))
+                mc, Lb, delta_s, q_nom = self._apply_cip(
+                    mc, Lb, delta_s, q_nom, temp_c, n_total_elem
+                )
+                for ei in range(n_total_elem):
+                    for zi in range(NZ):
+                        TMP_Pa_approx = P0_bar * 1.0e5 * 0.5
+                        Rc_seg[ei][zi] = self._rc(mc[ei][zi], TMP_Pa_approx)
+                        Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
+                        Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
+                        Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
+                _deferred_cip = False
+                snap["cip_count"] = cip_count_total
 
             # ---- Compute Element Autopsy & Mechanism Totals (PRE-REPLACEMENT) ----
             # We must compute this before the replacement trigger resets all arrays to 0
@@ -769,10 +836,19 @@ class PhysicsAgingEngine:
                 NPF_curr   = snap["npf"]
             P_prev_year_end = P_curr_bar
 
+            # ---- Dominant mechanism calculation --------------------------
+            R_curr_dict = {
+                "cake_colloidal": snap["rc_avg"],
+                "biofouling":     snap["rb_avg"],
+                "scaling":        snap["rs_avg"],
+                "nom_adsorption": snap["rn_avg"],
+            }
+            dom = self._dominant_mechanism_from_R(R_curr_dict, R_prev_dict)
+            snap["dominant_mechanism"] = dom
+            R_prev_dict.update(R_curr_dict)
+
         # ---- Dominant mechanism at final year ------------------------
         final = annual_snapshots[-1]
-        dom = self._dominant_mechanism(final)
-        final["dominant_mechanism"] = dom
 
         element_autopsy = current_element_autopsy
         mechanism_totals = current_mechanism_totals
@@ -789,7 +865,7 @@ class PhysicsAgingEngine:
             "baseline":              year0,
             "cip_events":            cip_events,
             "replacement_events":    replacement_events,
-            "dominant_mechanism":    dom,
+            "dominant_mechanism":    final.get("dominant_mechanism", "none"),
             "monthly_profile":       monthly_profile,
             "element_autopsy":       element_autopsy,
             "mechanism_totals":      mechanism_totals,
@@ -965,18 +1041,31 @@ class PhysicsAgingEngine:
     def _ode_biofilm(self, Lb: float, Jw: float, kM: float,
                      T_K: float, BDOC_bulk: float) -> float:
         """
-        Sub-model II: Biofilm growth/decay ODE.
-        dLb/dt [m/h] = mu_eff * Lb + Jb_seed - bd * Lb
-        mu_eff = mu_max * BDOC / (Ks + BDOC) * Arrhenius
+        Sub-model II: Biofilm growth/decay ODE — Logistic Monod kinetics.
+
+        dLb/dt [m/h] = mu_eff * Lb * (1 - Lb/Lb_max) + Jb_seed - bd * Lb
+
+        The logistic term (1 - Lb/Lb_max) enforces a carrying capacity:
+        - At low Lb: growth is approximately exponential (Lb << Lb_max)
+        - At Lb → Lb_max: growth rate → 0, biofilm reaches steady state
+        - Lb_max ~ 200 µm from van Loosdrecht (1995), Vrouwenvelder (2010)
+          reflecting nutrient diffusion limitation and shear detachment
+
+        Without this term, Monod kinetics produce unbounded exponential growth
+        (annual factor ~20×) giving unphysical cm-scale biofilms by Year 3.
         """
         p = self.p
         arr   = _arrhenius(p["Ea_bio"], T_K, p["T_ref_bio"])
-        BDOC_s = BDOC_bulk  # kg/m³ already
+        BDOC_s   = BDOC_bulk      # kg/m³ already
         BDOC_mgl = BDOC_s * 1.0e6  # back to mg/L for Monod
         mu_eff = (p["mu_max"] * arr
                   * BDOC_mgl / (p["Ks"] + BDOC_mgl + 1e-12))
 
-        growth = mu_eff * Lb + p["Jb_seed"]
+        Lb_max = p.get("Lb_max", 2.0e-4)   # carrying capacity [m]
+        # Logistic growth: mu_eff * Lb * (1 - Lb/Lb_max)
+        # This gives S-shaped (sigmoidal) growth matching real biofilm observations
+        logistic_factor = max(0.0, 1.0 - Lb / max(Lb_max, 1e-9))
+        growth = mu_eff * Lb * logistic_factor + p["Jb_seed"]
         decay  = p["bd"] * Lb
         return growth - decay
 
@@ -999,31 +1088,42 @@ class PhysicsAgingEngine:
         except Exception:
             CP_wall = 1.0
 
-        # SI at wall: simplified calcite SI ~ pH-dependent offset
-        # SI_wall = log10(CP_wall) as concentration enhancement
+        # SI at wall: bulk SI + log10(CP enhancement)
+        # SI_wall = SI_bulk + log10(CP_wall)  [log10-scale Langelier-type index]
         si_enh = math.log10(max(CP_wall, 1.0))
+        si_wall_total = self.si_calc_bulk + si_enh
 
-        # Induction time (CNT) – simplified formula
-        #   t_ind ~ A_ind * exp(Delta_G / kT) / kT  (proportional to exp(1/SI^2))
-        si_w = max(0.01, si_enh)
-        # Theta correction for heterogeneous nucleation
+        # Only positive SI drives scaling (supersaturated condition)
+        si_w = max(0.01, si_wall_total)
+
+        # Theta correction for heterogeneous nucleation (CNT)
         theta = math.radians(p["theta_contact"])
         f_het = 0.25 * (2.0 + math.cos(theta)) * (1.0 - math.cos(theta))**2
 
-        # Gibbs free energy: proportional to 1/ln^2(SI_w+1)
-        lnS   = math.log(max(1.0 + si_w, 1.001))
+        # --- Standard CNT Gibbs free energy barrier ---
+        # S  = 10^SI  (true supersaturation ratio, dimensionless)
+        # ln(S) = SI * ln(10)  — NOT ln(1+SI)
+        # dG*/kT = f_het * 16π γ³ Vm² / (3 (kT ln S)²)  simplified as 4/(3 ln²S)
+        S   = 10.0 ** si_w                    # supersaturation ratio
+        lnS = math.log(max(S, 1.001))         # ln(S) — physically correct
         dG_kT = f_het * 4.0 / (3.0 * lnS**2)
         t_ind_base = p["A_ind"] * _safe_exp(dG_kT) * t_ind_factor / 3600.0  # hours
 
-        # SI accumulation rate: 1.0 h/h beyond induction
-        dt_SI = 1.0  # integrates time; checked against t_ind_base
+        # t_SI accumulates elapsed time each timestep (in hours)
+        dt_SI = 1.0
 
-        # Scale growth rate (after induction)
+        # --- Parabolic crystal growth (Nielsen 1984, Hasson 1998) ---
+        # d(delta_s)/dt = kg * (S-1)^ns / rho   — driving force is (S-1), not SI
         if t_SI > t_ind_base and si_w > 0:
-            # Crystal growth: d(delta_s)/dt = kg * (SI-1)^ns / rho_calcite
-            SI_excess = max(0.0, si_w)
-            growth_rate = (p["kg_calcite"] * (SI_excess ** p["ns_calcite"])
-                           / p["rho_calcite"])
+            SI_excess = max(0.0, S - 1.0)      # (S-1) is the true driving force
+            # Antiscalant suppresses growth rate by 80% in addition to induction delay
+            growth_suppression = 0.20 if t_ind_factor > 1.0 else 1.0
+            growth_rate = (
+                p["kg_calcite"]
+                * (SI_excess ** p["ns_calcite"])
+                / p["rho_calcite"]
+                * growth_suppression
+            )
         else:
             growth_rate = 0.0
 
@@ -1179,9 +1279,9 @@ class PhysicsAgingEngine:
         # ---- FRI per element -----------------------------------------
         FRI_list  = []
         for ei in range(n_total_elem):
-            Rf  = Rc_elem[ei] + Rb_elem[ei] + Rs_elem[ei] + Rn_elem[ei]
-            Rf += Rcomp_elem[ei]
-            fri = Rf / (Rm_base + Rf + 1e-30)
+            Rf_foul  = Rc_elem[ei] + Rb_elem[ei] + Rs_elem[ei] + Rn_elem[ei]
+            Rf_total = Rf_foul + Rcomp_elem[ei]
+            fri = Rf_foul / (Rm_base + Rf_foul + 1e-30)
             FRI_list.append(fri)
         FRI_sys = sum(FRI_list) / n_total_elem
 
@@ -1257,50 +1357,85 @@ class PhysicsAgingEngine:
         SEC_y  = (hp_kw + bp_kw) / max(Qp_y, 0.001)
 
         # ---- ASTM D4516-19a normalised metrics -----------------------
-        # NPF: normalised permeate flow
-        TCF_ratio = 1.0  # same temp assumed
-        NPF = (Qp_y / Q0) * TCF_ratio if Q0 > 0 else 1.0
+        #
+        # The engine runs in constant-recovery (constant-flow) bisection mode:
+        # the solver increases feed pressure until Qp_y == Q0 (target recovery).
+        #
+        # ASTM D4516-19a full NPF formula:
+        #   NPF = (Qp_y / Q0) * TCF_ratio * (NDP_0 / NDP_y)
+        #
+        # In constant-flow mode Qp_y ≈ Q0 (by design), so the Qp ratio ≈ 1.
+        # The NDP ratio is what carries the signal:
+        #   NDP_y > NDP_0  →  NPF < 1.0  (correct: more pressure needed for same flow)
+        #
+        # This is the industry-standard treatment for constant-permeate-flow plants
+        # (e.g. AWWA M46, Filmtec ROSA, AspenTech WaterPro).
 
-        # NDP: average element NDP
+        # NDP_y: average element NDP from bisection result
         elems_y = best_result.get("elements", [])
         if elems_y:
             NDP_y = sum(e.get("ndp", NDP_0) for e in elems_y) / len(elems_y)
         else:
-            NDP_y = NDP_0 * (1.0 + FRI_sys)
+            NDP_y = NDP_0 * (1.0 + FRI_sys)   # fallback: fouling raises NDP
+        NDP_ratio  = NDP_y / max(NDP_0, 1e-6)
 
-        NDP_ratio = NDP_y / max(NDP_0, 1e-6)
+        TCF_ratio  = 1.0   # same temperature → TCF = 1
 
-        # NSP: ASTM D4516-19a normalised salt passage
-        # NSP = (Cp_y * Qp0) / (Cp0 * Qp_y)  -- ratio of salt mass passage rates
-        # At Year 0: NSP = 1.0. As fouling worsens (CP increases), NSP rises.
-        # Note: B_rel degradation also changes TDS_y, but CIP cannot reverse it.
-        # For CIP triggering, we use NSP_fouling only (B_rel contribution removed).
-        SP0 = TDS0       # mg/L permeate at Year 0
-        SP_y = TDS_y     # mg/L permeate at Year N
-        # Normalised salt passage (total): corrected to same permeate flow
-        NSP_total = (SP_y * max(Q0, 0.001)) / (max(SP0, 1e-6) * max(Qp_y, 0.001))
-        # B_rel contribution: when B_rel < 1, salt perm is lower → NSP_Brel < 1
-        B_rel_avg_local = sum(B_rel) / n_total_elem
-        # NSP from fouling only (removing B_rel effect):
-        # NSP_fouling = NSP_total / (1/B_rel) = NSP_total * B_rel
-        # This isolates the fouling-driven CP increase from chemical degradation.
-        NSP_fouling = NSP_total * B_rel_avg_local
-        # Report total NSP (for display), use fouling-only for CIP triggering
+        NDP_y_safe = max(NDP_y, 1e-6)
+        NPF = (Qp_y / max(Q0, 1e-6)) * TCF_ratio * (NDP_0 / NDP_y_safe)
+        NPF = max(0.0, min(NPF, 2.0))  # physical clamp
+
+        # ---- B_rel average across system ----------------------------
+        B_rel_avg = sum(B_rel) / n_total_elem
+
+        # To align with industry standard projections where permeate TDS
+        # tracks chemical degradation (B-value increase) without being fully
+        # suppressed by system-level hydraulic flux flattening, we explicitly
+        # scale the salt passage by the average chemical degradation factor.
+        TDS_y = s["perm_tds"] * B_rel_avg
+
+        # NSP: ASTM D4516-19a normalised salt passage — constant-flow mode
+        #
+        # In constant-FLOW mode (Qp_y ≈ Qp_0), the NDP correction does NOT apply:
+        #   NSP = (Cp_y × Qp_y) / (Cp_0 × Qp_0) = Cp_y / Cp_0 = TDS_y / TDS_0
+        SP0  = max(TDS0, 1e-6)   # mg/L permeate at Year 0 (reference)
+        SP_y = TDS_y              # mg/L permeate at Year N (measured)
+        NSP_total   = SP_y / SP0
+        NSP_total   = max(0.0, NSP_total)
+
+        # Fouling-only NSP (B_rel contribution isolated):
+        # Removing chemical degradation leaves the concentration-polarisation-driven component.
+        NSP_fouling = NSP_total / max(B_rel_avg, 1e-6)
         NSP = NSP_total
 
-        # ---- Wall-level SI indicators (simplified) -------------------
-        Jw_avg_global = sum(
-            sum(Rb_seg[ei]) / NZ for ei in range(n_total_elem)
-        ) / n_total_elem   # proxy for biofilm; use Lb for actual
-        kM_avg = 5.0e-6   # typical order
+        # ---- Wall-level SI indicators (Jw/kM concentration polarisation) ---
+        # Jw_avg from year-end permeate flow over total membrane area
+        elem_area_m2 = membrane.get("area_m2", 37.2)    # m² per element from membrane spec
+        A_total_m2   = elem_area_m2 * n_total_elem
+        Jw_avg_ms    = (Qp_y / 3600.0) / max(A_total_m2, 1e-6)   # [m/s]
+
+        # kM degrades as fouling accumulates (crossflow disruption by cake/biofilm):
+        # kM = kM_clean * (1 - foul_fraction)  where foul_fraction is scaled by FRI
+        kM_clean = 5.0e-6   # m/s — clean membrane baseline (Graetz-Lévêque typical for spiral)
+        foul_kM  = max(0.0, min(0.60, FRI_sys))   # cap crossflow degradation at 60%
+        kM_avg   = kM_clean * (1.0 - 0.5 * foul_kM)  # kM can drop to 40% of clean at max fouling
+
+        # True CP factor: exp(Jw/kM) — clipped to prevent runaway
         try:
-            CP_avg = _safe_exp((Qp_y / max(Q0, 0.001)) * 0.3)
+            CP_avg = _safe_exp(Jw_avg_ms / max(kM_avg, 1e-9))
+            CP_avg = min(CP_avg, 5.0)   # physical cap: CP > 5 is membrane failure territory
         except Exception:
             CP_avg = 1.0
-        si_calcite_wall = self.si_calc_bulk + math.log10(max(CP_avg, 1.001))
-        si_gypsum_wall  = self.si_gyps_bulk + math.log10(max(CP_avg, 1.001)) * 0.6
-        si_barite_wall  = self.si_bari_bulk + math.log10(max(CP_avg, 1.001)) * 0.4
-        si_silica_wall  = self.si_sili_bulk + math.log10(max(CP_avg, 1.001)) * 0.3
+
+        # All dissolved 1:1 electrolytes (CaCO3, CaSO4, BaSO4, SiO2) experience
+        # the same log10(CP) shift in wall concentration relative to bulk concentrate.
+        # Industry standard: SI_wall = SI_bulk_concentrate + log10(CP)
+        cp_log10 = math.log10(max(CP_avg, 1.0))
+        si_calcite_wall = self.si_calc_bulk + cp_log10
+        si_gypsum_wall  = self.si_gyps_bulk + cp_log10
+        si_barite_wall  = self.si_bari_bulk + cp_log10
+        si_silica_wall  = self.si_sili_bulk + cp_log10
+
 
         # ---- Dominant mechanism from resistances ---------------------
         Rc_avg_g = sum(Rc_elem) / n_total_elem
@@ -1309,13 +1444,7 @@ class PhysicsAgingEngine:
         Rn_avg_g = sum(Rn_elem) / n_total_elem
         Rk_avg_g = sum(Rcomp_elem) / n_total_elem
 
-        dom = self._dominant_mechanism_from_R(
-            Rc_avg_g, Rb_avg_g, Rs_avg_g, Rn_avg_g, Rk_avg_g
-        )
-
-        # ---- B_rel average across system ----------------------------
-        B_rel_avg = sum(B_rel) / n_total_elem
-
+        # (B_rel_avg calculated above)
         return {
             "year":                 year,
             "perm_flow":            Qp_y,
@@ -1337,7 +1466,7 @@ class PhysicsAgingEngine:
             "cip_triggered":        False,
             "replacement_triggered": False,
             "cip_count":            cip_count,
-            "dominant_mechanism":   dom,
+            "dominant_mechanism":   "unknown",
             "si_calcite_wall":      si_calcite_wall,
             "si_gypsum_wall":       si_gypsum_wall,
             "si_barite_wall":       si_barite_wall,
@@ -1352,32 +1481,13 @@ class PhysicsAgingEngine:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _dominant_mechanism(self, snap: dict) -> str:
-        """Determine dominant fouling mechanism from a YearResult snapshot."""
-        return self._dominant_mechanism_from_R(
-            snap.get("rc_avg", 0),
-            snap.get("rb_avg", 0),
-            snap.get("rs_avg", 0),
-            snap.get("rn_avg", 0),
-            snap.get("rcomp", 0),
-        )
-
-    def _dominant_mechanism_from_R(
-        self,
-        Rc: float, Rb: float, Rs: float, Rn: float, Rk: float
-    ) -> str:
-        """Return string label of the largest resistance contributor."""
-        vals = {
-            "cake_colloidal": Rc,
-            "biofouling":     Rb,
-            "scaling":        Rs,
-            "nom_adsorption": Rn,
-            "compaction":     Rk,
-        }
-        total = sum(vals.values())
-        if total < 1.0:
+    def _dominant_mechanism_from_R(self, R_curr: dict, R_prev: dict) -> str:
+        """Return string label of the largest resistance contributor over the interval."""
+        delta = {k: R_curr[k] - R_prev.get(k, 0.0) for k in R_curr}
+        total_delta = sum(delta.values())
+        if total_delta < 1e-6:
             return "none"
-        return max(vals, key=vals.get)
+        return max(delta, key=delta.get)
 
     def _fallback_snapshot(
         self,

@@ -1247,20 +1247,20 @@ class ReportGenerator:
 
         # ── Fouling mechanism breakdown at selected year ───────────────────────
         _heading(doc, f'Fouling Resistance Breakdown at Year {selected_year}', size=11)
+        rf_sum = sel.get('rc_avg', 0) + sel.get('rb_avg', 0) + sel.get('rs_avg', 0) + sel.get('rn_avg', 0)
         _data_table(doc,
             [['Fouling Mechanism', 'Resistance (m\u207b\u00b9)', 'Relative Contribution']],
             [
                 ['Colloidal Cake (Rc)', f"{sel.get('rc_avg', 0):.3e}",
-                 f"{sel.get('rc_avg', 0) / max(sel.get('rc_avg', 0)+sel.get('rb_avg', 0)+sel.get('rs_avg', 0)+sel.get('rn_avg', 0)+sel.get('rcomp', 0), 1e-10) * 100:.1f}%"],
+                 f"{sel.get('rc_avg', 0) / max(rf_sum, 1e-10) * 100:.1f}%"],
                 ['Biofilm (Rb)', f"{sel.get('rb_avg', 0):.3e}",
-                 f"{sel.get('rb_avg', 0) / max(sel.get('rc_avg', 0)+sel.get('rb_avg', 0)+sel.get('rs_avg', 0)+sel.get('rn_avg', 0)+sel.get('rcomp', 0), 1e-10) * 100:.1f}%"],
+                 f"{sel.get('rb_avg', 0) / max(rf_sum, 1e-10) * 100:.1f}%"],
                 ['Mineral Scaling (Rs)', f"{sel.get('rs_avg', 0):.3e}",
-                 f"{sel.get('rs_avg', 0) / max(sel.get('rc_avg', 0)+sel.get('rb_avg', 0)+sel.get('rs_avg', 0)+sel.get('rn_avg', 0)+sel.get('rcomp', 0), 1e-10) * 100:.1f}%"],
+                 f"{sel.get('rs_avg', 0) / max(rf_sum, 1e-10) * 100:.1f}%"],
                 ['NOM Adsorption (Rn)', f"{sel.get('rn_avg', 0):.3e}",
-                 f"{sel.get('rn_avg', 0) / max(sel.get('rc_avg', 0)+sel.get('rb_avg', 0)+sel.get('rs_avg', 0)+sel.get('rn_avg', 0)+sel.get('rcomp', 0), 1e-10) * 100:.1f}%"],
-                ['Compaction (Rcomp)', f"{sel.get('rcomp', 0):.3e}",
-                 f"{sel.get('rcomp', 0) / max(sel.get('rc_avg', 0)+sel.get('rb_avg', 0)+sel.get('rs_avg', 0)+sel.get('rn_avg', 0)+sel.get('rcomp', 0), 1e-10) * 100:.1f}%"],
-                ['Dominant Mechanism', physics.get('dominant_mechanism', 'N/A'), ''],
+                 f"{sel.get('rn_avg', 0) / max(rf_sum, 1e-10) * 100:.1f}%"],
+                ['Compaction (Structural)', f"{sel.get('rcomp', 0):.3e}", 'N/A'],
+                ['Dominant Mechanism', physics.get('dominant_mechanism', 'N/A').replace('_', ' ').title(), ''],
             ],
             col_widths=[5.5, 4.5, 4.5]
         )

@@ -759,7 +759,8 @@ def _run_projection_core(
 
     # For 2P-RO, baseline["ro_results"] was constructed above with the true combined
     # system summary (correct TDS, SEC, recovery, flow). Prefer it over raw pass1_results.
-    baseline_ro = baseline.get("ro_results") or baseline.get("pass1_results") or {}
+    # For 1P-RO, baseline itself contains the summary and recycle data.
+    baseline_ro = baseline.get("ro_results") or baseline.get("pass1_results") or baseline
 
     # ── Recycle: blended feed ion concentrations for physics engine ──────
     # Industry-standard approach: use the ACTUAL converged blended feed ions
@@ -913,13 +914,35 @@ def _run_projection_core(
 
     # Ensure physics engine snapshots reflect the TRUE system recovery/flow (vital for 2P-RO)
     if "annual_snapshots" in physics_results:
+        # Extract baseline metrics, supporting both 1-Pass (summary) and 2-Pass (system_summary)
         base_summ = baseline_ro.get("summary", {})
+        sys_summ  = baseline_ro.get("system_summary", {})
+        # Recycle data is stored at the root of the baseline object
+        recycle_data = baseline.get("recycle", {})
 
-        true_recovery      = base_summ.get("total_recovery", target_recovery_pct / 100.0)
-        true_perm          = base_summ.get("perm_flow", None)
-        true_base_pressure = base_summ.get("feed_pressure_bar", None)
+        if sys_summ:  # 2-Pass RO
+            true_recovery = sys_summ.get("overall_recovery", target_recovery_pct / 100.0)
+            true_perm     = sys_summ.get("final_permeate_flow_m3h", None)
+        else:         # 1-Pass RO
+            true_recovery = base_summ.get("total_recovery", target_recovery_pct / 100.0)
+            true_perm     = base_summ.get("perm_flow", None)
+            
+        true_base_pressure = base_summ.get("feed_pressure_bar", None)  # P1 pressure
         true_base_tds      = base_summ.get("perm_tds", None)
-        true_base_sec      = base_summ.get("sec_kwh_m3", None)
+        if "pass2" in baseline_ro:  # For 2-Pass RO, TDS comes from Pass 2
+            true_base_tds = baseline_ro["pass2"]["summary"].get("perm_tds", true_base_tds)
+
+        true_base_sec = sys_summ.get("sec_kwh_m3") if sys_summ else base_summ.get("sec_kwh_m3", None)
+
+        # OVERRIDE: If recycle is enabled, use the effective system recovery
+        if recycle_data and recycle_data.get("enabled"):
+            true_recovery = recycle_data.get("effective_system_recovery", true_recovery)
+            # Explicitly force the permeate flow to match the effective recovery of the fresh feed
+            true_perm = true_recovery * target_flow_m3h
+            
+        print("DEBUG RECOVERY: true_recovery =", true_recovery)
+        print("DEBUG RECOVERY: sys_summ =", sys_summ)
+        print("DEBUG RECOVERY: recycle_data =", recycle_data)
 
         snaps = physics_results["annual_snapshots"]
 
@@ -943,11 +966,6 @@ def _run_projection_core(
             phys_clean_p   = snaps[1]["feed_pressure_bar"]
             phys_clean_tds = snaps[1]["perm_tds"]
             phys_clean_sec = snaps[1]["sec_kwh_m3"]
-            # NPF: physics engine computes Qp_pass1 / Q0_combined → gives >1 artifact.
-            # Normalize all NPF values so Year 1 = 1.0, showing relative degradation only.
-            phys_clean_npf = snaps[1]["npf"] if snaps[1]["npf"] > 0 else 1.0
-            # NSP: same Q0 mismatch causes NSP to be skewed. Normalize to Year 1.
-            phys_clean_nsp = snaps[1]["nsp"] if snaps[1]["nsp"] > 0 else 1.0
 
             for snap in snaps[1:]:
                 snap["recovery"] = true_recovery
@@ -967,11 +985,13 @@ def _run_projection_core(
                     delta_sec = snap["sec_kwh_m3"] - phys_clean_sec
                     snap["sec_kwh_m3"] = true_base_sec + delta_sec
 
-                # Normalize NPF so Year 1 = 1.0 (removes Q0 mismatch artifact)
-                snap["npf"] = snap["npf"] / phys_clean_npf
+                # NPF and NSP: the physics engine now uses the correct ASTM D4516-19a
+                # constant-flow formula (NDP_0 / NDP_y). Values are already physically
+                # correct and monotonically declining — no normalization needed.
+                # Year 0 = 1.0 (forced by the engine), Year N < 1.0 (as fouling grows).
 
-                # Normalize NSP so Year 1 = 1.0 (same mismatch)
-                snap["nsp"] = snap["nsp"] / phys_clean_nsp
+    # Expose antiscalant state to frontend for SI risk threshold selection
+    physics_results["antiscalant_dosed"] = antiscalant_dosed
 
     return {
         "baseline":        baseline,
