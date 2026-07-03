@@ -9,14 +9,9 @@ import io
 import tempfile
 from datetime import datetime
 
-# Serverless fix: Matplotlib needs a writable directory for its font cache.
-# Vercel's filesystem is read-only except for /tmp.
-os.environ['MPLCONFIGDIR'] = '/tmp'
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 import matplotlib.ticker as mticker
 import numpy as np
 

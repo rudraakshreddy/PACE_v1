@@ -3,5 +3,6 @@ uvicorn
 phreeqpython
 pydantic
 matplotlib
-numpy<2.0.0
+numpy
 python-docx
+pymupdf
