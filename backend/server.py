@@ -1,8 +1,24 @@
+import sys
+import os
+
+# ---- Vercel path fix ------------------------------------------------
+# On Vercel, server.py runs from the project root (not from backend/).
+# All sibling modules (process_engine, system_engine, etc.) live in
+# backend/ so we must add that directory to sys.path explicitly.
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+if _backend_dir not in sys.path:
+    sys.path.insert(0, _backend_dir)
+# ---------------------------------------------------------------------
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import phreeqpython
-from process_engine import ProcessInputData, ProcessRecommendationEngine
+try:
+    import phreeqpython
+    _phreeqpython_available = True
+except Exception:
+    phreeqpython = None
+    _phreeqpython_available = False
 from process_engine import ProcessInputData, ProcessRecommendationEngine
 from system_engine import SystemEngine
 from membrane_database import MembraneDatabase
@@ -11,7 +27,6 @@ from membrane_recommender import MembraneRecommender
 from aging_engine import AgingEngine
 from typing import List, Optional, Dict
 from fastapi.responses import FileResponse, RedirectResponse
-import os
 
 app = FastAPI(title="PHREEQC Scaling Engine API")
 
@@ -82,8 +97,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize PHREEQC engine
-pp = phreeqpython.PhreeqPython(database='phreeqc.dat')
+# Initialize PHREEQC engine (lazy — may be unavailable on Vercel serverless)
+try:
+    pp = phreeqpython.PhreeqPython(database='phreeqc.dat') if _phreeqpython_available else None
+except Exception as _pp_err:
+    print(f"[WARN] phreeqpython init failed: {_pp_err}")
+    pp = None
 
 class FeedWaterData(BaseModel):
     temperature: float = 25.0

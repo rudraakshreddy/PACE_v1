@@ -1,6 +1,9 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-import phreeqpython
+try:
+    import phreeqpython
+except Exception:
+    phreeqpython = None
 
 class ProcessInputData(BaseModel):
     # Core
@@ -45,7 +48,7 @@ class ProcessInputData(BaseModel):
     target_flow: Optional[float] = None
 
 class ProcessRecommendationEngine:
-    def __init__(self, pp_instance: phreeqpython.PhreeqPython):
+    def __init__(self, pp_instance: Any):
         self.pp = pp_instance
         self.state = {
             "primary_config": None,

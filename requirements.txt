@@ -5,4 +5,3 @@ pydantic
 matplotlib
 numpy
 python-docx
-pymupdf

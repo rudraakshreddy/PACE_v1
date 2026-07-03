@@ -19,5 +19,11 @@
       "src": "/(.*)",
       "dest": "ui_ux_design/$1"
     }
-  ]
+  ],
+  "functions": {
+    "backend/server.py": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
 }
