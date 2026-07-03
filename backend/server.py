@@ -22,7 +22,7 @@ except Exception:
 from process_engine import ProcessInputData, ProcessRecommendationEngine
 from system_engine import SystemEngine
 from membrane_database import MembraneDatabase
-from report_generator import ReportGenerator
+
 from membrane_recommender import MembraneRecommender
 from aging_engine import AgingEngine
 from typing import List, Optional, Dict
@@ -502,6 +502,7 @@ def generate_calc_report(data: SystemCalcInput):
         tmp_docx.close()
         tmp_pdf = tmp_docx.name.replace(".docx", ".pdf")
 
+        from report_generator import ReportGenerator
         reporter = ReportGenerator()
         reporter.generate_calculation_report(result, tmp_docx.name)
 
