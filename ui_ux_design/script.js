@@ -1,3 +1,4 @@
+const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
 window.isProjectDirty = false;
 
 window.showLoader = function() {
@@ -43,7 +44,7 @@ window.fetch = async function(...args) {
     if (isCalc && window.showLoader) window.showLoader();
     const startTime = Date.now();
     try {
-        if (url && typeof url === 'string' && url.includes('localhost:8000')) {
+        if (url && typeof url === 'string' && (url.includes('localhost:8000') || url.includes('/api/'))) {
             const opts = args[1] || {};
             opts.headers = opts.headers || {};
             
@@ -1118,7 +1119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (id === 'calculation-tab-btn') {
                     if (typeof window.updateLivePFD === 'function') window.updateLivePFD();
                     
-                    fetch('http://localhost:8000/api/membranes')
+                    fetch(API_BASE + '/api/membranes')
                         .then(res => res.json())
                         .then(data => {
                             if(data.ro_membranes) {
@@ -1334,7 +1335,7 @@ async function runPhreeqcCalculation() {
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Calculating...';
 
-        const response = await fetch('http://localhost:8000/api/calculate-scaling', {
+        const response = await fetch(API_BASE + '/api/calculate-scaling', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1477,7 +1478,7 @@ async function fetchProcessRecommendation() {
         btn.disabled = true;
         btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...';
         
-        const response = await fetch('http://localhost:8000/api/process-recommendation', {
+        const response = await fetch(API_BASE + '/api/process-recommendation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1716,7 +1717,7 @@ async function fetchMembraneRecommendation() {
             elements_per_vessel: safeInputVal('calc-elements-pv', 6)
         };
 
-        const response = await fetch('http://localhost:8000/api/recommend-membrane', {
+        const response = await fetch(API_BASE + '/api/recommend-membrane', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -3744,7 +3745,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 console.log('[AutoSelect] Sending payload:', JSON.stringify(payload));
-                const res = await fetch('http://localhost:8000/api/auto-select-membrane', {
+                const res = await fetch(API_BASE + '/api/auto-select-membrane', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -4024,7 +4025,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload.antiscalant_dosed = safeStr('phys-antiscalant', 'true') === 'true';
                 }
 
-                const url = isPhysics ? 'http://localhost:8000/api/calculate-system-physics' : 'http://localhost:8000/api/calculate-system';
+                const url = isPhysics ? API_BASE + '/api/calculate-system-physics' : API_BASE + '/api/calculate-system';
 
                 const res = await fetch(url, {
                     method: 'POST',
@@ -4451,7 +4452,7 @@ document.addEventListener('DOMContentLoaded', () => {
             reportBtn.disabled = true;
 
             try {
-                const res = await fetch('http://localhost:8000/api/generate-calculation-report', {
+                const res = await fetch(API_BASE + '/api/generate-calculation-report', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(window.lastCalcPayload)
@@ -5633,7 +5634,7 @@ window.openMembraneDbModal = async function() {
     if (countEl) countEl.innerText = "Loading membranes...";
 
     try {
-        const response = await fetch('http://localhost:8000/api/membranes');
+        const response = await fetch(API_BASE + '/api/membranes');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
@@ -5942,7 +5943,7 @@ window.runAgingSimulation = async function() {
             target_flow_m3h: flow
         };
 
-        const response = await fetch('http://localhost:8000/api/simulate-aging', {
+        const response = await fetch(API_BASE + '/api/simulate-aging', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
