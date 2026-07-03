@@ -20,6 +20,10 @@
       "dest": "ui_ux_design/$1"
     }
   ],
+  "env": {
+    "MPLCONFIGDIR": "/tmp",
+    "MPLBACKEND": "Agg"
+  },
   "functions": {
     "backend/server.py": {
       "maxDuration": 60,
