@@ -976,35 +976,17 @@ def _run_projection_core(
             if true_base_tds      is not None: snaps[0]["perm_tds"]          = true_base_tds
             if true_base_sec      is not None: snaps[0]["sec_kwh_m3"]        = true_base_sec
 
-        # ── Correct Years 1-N using DELTA approach ─────────────────────────
-        # The physics engine's Year 1 bisection result is its "effectively clean"
-        # state (no accumulated fouling yet). We treat this as the zero-delta
-        # reference: Year1 display = True Baseline, Year N display = True Baseline
-        # + (PhysicsYearN - PhysicsYear1). This correctly handles the model-mismatch
-        # between the design engine (uses FF=0.85) and the physics aging engine.
+        # The physics engine has been updated to calibrate A0 to match the exact P0_bar
+        # at Year 0, so no delta-correction is needed anymore. The raw physics output
+        # is correctly anchored to the baseline.
+        
+        # We only need to overwrite the recovery and perm_flow to match the true system
         if len(snaps) > 1:
-            phys_clean_p   = snaps[1]["feed_pressure_bar"]
-            phys_clean_tds = snaps[1]["perm_tds"]
-            phys_clean_sec = snaps[1]["sec_kwh_m3"]
-
             for snap in snaps[1:]:
                 snap["recovery"] = true_recovery
                 if true_perm is not None:
                     snap["perm_flow"] = true_perm
-
-                # Delta = how much the physics engine says it degraded vs clean Year 1
-                if true_base_pressure is not None:
-                    delta_p = snap["feed_pressure_bar"] - phys_clean_p
-                    snap["feed_pressure_bar"] = true_base_pressure + delta_p
-
-                if true_base_tds is not None:
-                    delta_tds = snap["perm_tds"] - phys_clean_tds
-                    snap["perm_tds"] = true_base_tds + delta_tds
-
-                if true_base_sec is not None:
-                    delta_sec = snap["sec_kwh_m3"] - phys_clean_sec
-                    snap["sec_kwh_m3"] = true_base_sec + delta_sec
-
+                
                 # NPF and NSP: the physics engine now uses the correct ASTM D4516-19a
                 # constant-flow formula (NDP_0 / NDP_y). Values are already physically
                 # correct and monotonically declining — no normalization needed.

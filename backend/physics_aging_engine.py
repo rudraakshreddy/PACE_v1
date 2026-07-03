@@ -93,18 +93,18 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
     "T_ref_B":     298.15,    # reference T [K]
 
     # CIP kinetics (Section 6)
-    "kd_acid":     1.3e-4,    # acid dissolution rate [m/(s·M)]
+    "kd_acid":     0.020,     # acid dissolution rate [m/(s·M)] - calibrated for 95% removal at pH 2.0 in 4h
     "Ea_dis":      35000.0,   # activation energy calcite dissolution [J/mol]
     "cip_ph_acid": 2.5,       # acid CIP pH
-    "kd_bio":      1.9e-2,    # biofilm alkaline removal [m/(s·M)] — calibrated for 85% removal at pH 11.5
+    "kd_bio":      0.050,     # biofilm alkaline removal [m/(s·M)] — calibrated for 95% removal at pH 12.0 in 4h
     "kd_NOM":      6.0e-3,    # NOM alkaline hydrolysis [m/(s·M)]
     "Ea_bio_rem":  38000.0,   # activation energy biofilm removal [J/mol]
     "cip_ph_alk":  11.5,      # alkaline CIP pH
     "T_cip":       298.15,    # CIP temperature [K]
     "tCIP_acid":   4.0,       # acid CIP duration [h]
     "tCIP_alk":    4.0,       # alkaline CIP duration [h]
-    "kd_coll":     1.0e-5,    # chelant colloidal cake removal [m/(s·M)]
-    "chelant_conc": 0.01,     # chelant concentration [M]
+    "kd_coll":     0.003,     # chelant colloidal cake removal [m/(s·M)] - calibrated for 90% removal in 4h
+    "chelant_conc": 0.05,     # chelant concentration [M]
 
     # CIP trigger thresholds (ASTM / industry standard)
     "NPF_cip_trigger":     0.85,
@@ -136,11 +136,11 @@ DEFAULT_PHYSICS_PARAMS.update({
 
     # Biofouling (Sub-model II) — calibrated for realistic RO plant community
     # Literature (Bereschenko 2010, Vrouwenvelder 2010): mu_net ~ 0.005-0.04 h-1, doubling ~17h-10 days
-    # Lab P.aeruginosa (Herzberg 2007): mu_max ~ 0.2-0.4 h-1 — NOT appropriate for plant-scale model
-    "mu_max":      0.020,        # h⁻¹ — realistic RO plant community (mid of 0.01-0.05 literature range)
+    # Attached biofilms in RO grow significantly slower than planktonic cells.
+    "mu_max":      0.003,        # h⁻¹ — calibrated to allow monthly scale differentiation at high TOC
     "BDOC":        0.3,          # biodegradable DOC [mg/L] fraction of TOC
     "Ks":          0.8,          # half-saturation [mg/L] (oligotrophic RO community has high substrate affinity)
-    "bd":          4.0e-3,       # h⁻¹ — decay/detachment (literature: 0.005-0.01 h-1; lower = more conservative)
+    "bd":          5.0e-4,       # h⁻¹ — decay/detachment (lower = more stable biofilm)
     "Jb_seed":     5.0e-12,      # seeding flux [m/h]
     "Ea_bio":      45000.0,      # activation energy [J/mol]
 
@@ -431,6 +431,32 @@ class PhysicsAgingEngine:
             pi_est = P0_bar * r0 * 0.5   # rough osmotic estimate
             NDP_0  = max(P0_bar - 0.5 - pi_est, 1.0)
 
+        # ---- Calibrate A0_lmh_bar to match user's P0_bar ----------------
+        # The membrane catalog A0 might differ from the actual baseline performance.
+        A_lo, A_hi = A0_lmh_bar * 0.2, A0_lmh_bar * 5.0
+        for _ in range(20):
+            A_mid = (A_lo + A_hi) / 2.0
+            aged_params = {}
+            for s_idx in range(stages):
+                for e_idx in range(elements_per_vessel):
+                    aged_params[(s_idx + 1, e_idx + 1)] = {"A": A_mid, "B": B0_ms}
+            try:
+                res_calib = self.ro_engine.simulate_system(
+                    feed_flow_m3h, P0_bar, effective_feed_ions, temp_c,
+                    membrane_model, stages, vessels_per_stage,
+                    elements_per_vessel, aged_params=aged_params
+                )
+                if res_calib["summary"]["total_recovery"] < r0:
+                    A_lo = A_mid
+                else:
+                    A_hi = A_mid
+            except Exception:
+                A_hi = A_mid
+        A0_lmh_bar = (A_lo + A_hi) / 2.0
+        # Re-calculate intrinsic membrane resistance with calibrated A0
+        A0_SI   = A0_lmh_bar / (1000.0 * 3600.0 * 1.0e5)
+        Rm_base = 1.0 / (MU_25 * A0_SI)
+
         # ---- Initialise ODE state arrays ------------------------------
         # State per segment per element: [mc, Lb, delta_s, q, t_SI]
         # Each = list[n_total_elem][NZ]
@@ -490,6 +516,16 @@ class PhysicsAgingEngine:
             # Each entry: (elapsed_months, FRI_avg, B_rel_avg, cip_event_flag)
             month_cache: List[dict] = []
 
+            # Accumulators for annual average state
+            Rc_seg_avg = [[0.0]*NZ for _ in range(n_total_elem)]
+            Rb_seg_avg = [[0.0]*NZ for _ in range(n_total_elem)]
+            Rs_seg_avg = [[0.0]*NZ for _ in range(n_total_elem)]
+            Rn_seg_avg = [[0.0]*NZ for _ in range(n_total_elem)]
+            mc_avg     = [[0.0]*NZ for _ in range(n_total_elem)]
+            Lb_avg     = [[0.0]*NZ for _ in range(n_total_elem)]
+            delta_s_avg= [[0.0]*NZ for _ in range(n_total_elem)]
+            q_nom_avg  = [[0.0]*NZ for _ in range(n_total_elem)]
+
             for month in range(months_per_year):
                 # ---------------------------------------------------------
                 # 1. Spatial transport at frozen fouling state
@@ -524,9 +560,7 @@ class PhysicsAgingEngine:
                             mc[ei][zi], Jw, tau_w, TMP_Pa, Cf_bulk, mu
                         )
                         # ---------- Sub-model II: Biofouling --------------
-                        dLb_dt = self._ode_biofilm(
-                            Lb[ei][zi], Jw, kM_loc, T_K, nom_bulk
-                        )
+                        # Evaluated during sub-stepping below
                         # ---------- Sub-model III: Scaling ----------------
                         dds_dt, dt_SI = self._ode_scaling(
                             delta_s[ei][zi], t_SI[ei][zi], Jw, kM_loc,
@@ -550,8 +584,14 @@ class PhysicsAgingEngine:
                             mc_new = mc[ei][zi] + dmc_dt * dt_s
                         mc_new = max(0.0, mc_new)
 
-                        # Biofilm: ODE in m/h → convert
-                        Lb_new     = max(0.0, Lb[ei][zi]     + dLb_dt * DT_H)
+                        # Biofilm: Sub-stepped integration to prevent Euler instability
+                        n_steps_bio = 73
+                        dt_bio = DT_H / n_steps_bio
+                        Lb_curr = Lb[ei][zi]
+                        for _ in range(n_steps_bio):
+                            dLb_step = self._ode_biofilm(Lb_curr, Jw, kM_loc, T_K, nom_bulk)
+                            Lb_curr = max(0.0, Lb_curr + dLb_step * dt_bio)
+                        Lb_new = Lb_curr
                         
                         # Scale: ODE in m/s
                         ds_new     = max(0.0, delta_s[ei][zi] + dds_dt * dt_s)
@@ -586,6 +626,16 @@ class PhysicsAgingEngine:
                         Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
                         Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
                         Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
+
+                        # ---- Accumulate annual averages -----------------
+                        Rc_seg_avg[ei][zi] += Rc_seg[ei][zi] / 12.0
+                        Rb_seg_avg[ei][zi] += Rb_seg[ei][zi] / 12.0
+                        Rs_seg_avg[ei][zi] += Rs_seg[ei][zi] / 12.0
+                        Rn_seg_avg[ei][zi] += Rn_seg[ei][zi] / 12.0
+                        mc_avg[ei][zi]     += mc[ei][zi] / 12.0
+                        Lb_avg[ei][zi]     += Lb[ei][zi] / 12.0
+                        delta_s_avg[ei][zi]+= delta_s[ei][zi] / 12.0
+                        q_nom_avg[ei][zi]  += q_nom[ei][zi] / 12.0
 
                     # ---- Salt permeability degradation (per element) -----
                     kB_eff = (self.p["kB_chem"]
@@ -658,13 +708,15 @@ class PhysicsAgingEngine:
                 })
 
             # ---- Year-end snapshot via bisection solver ----------------
+            # We use the annual average state so that CIP frequency has a proportional impact
+            # on the reported annual pressure, rather than just the worst-case end-of-year state.
             snap = self._year_end_snapshot(
                 year, effective_feed_ions, temp_c, membrane_model, stages,
                 vessels_per_stage, elements_per_vessel, feed_flow_m3h,
                 target_recovery_pct, P0_bar, Q0, TDS0, NDP_0, SEC0,
-                Rc_seg, Rb_seg, Rs_seg, Rn_seg, Rcomp_elem,
+                Rc_seg_avg, Rb_seg_avg, Rs_seg_avg, Rn_seg_avg, Rcomp_elem,
                 B_rel, eps_comp, Rm_base, A0_lmh_bar, B0_ms,
-                n_total_elem, t_SI, delta_s, Lb, mc, q_nom,
+                n_total_elem, t_SI, delta_s_avg, Lb_avg, mc_avg, q_nom_avg,
                 cip_count_total, membrane
             )
             snap["cip_count"] = cip_count_total
@@ -692,6 +744,9 @@ class PhysicsAgingEngine:
                         Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
                         Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
                         Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
+                
+                # If CIP triggered at end of year, we re-run snapshot with the CLEANED state
+                # because the CIP fundamentally resets the membrane for the new year.
                 snap = self._year_end_snapshot(
                     year, effective_feed_ions, temp_c, membrane_model, stages,
                     vessels_per_stage, elements_per_vessel, feed_flow_m3h,
@@ -709,22 +764,23 @@ class PhysicsAgingEngine:
             # captures the actual fouled state. Apply it now so the next year starts
             # from the post-CIP cleaned state.
             if _deferred_cip:
-                elapsed_deferred = year * 12
-                cip_this_year = True
-                cip_count_total += 1
-                cip_events.append((year, f"Scheduled (Month {elapsed_deferred}) [post-snap]"))
-                mc, Lb, delta_s, q_nom = self._apply_cip(
-                    mc, Lb, delta_s, q_nom, temp_c, n_total_elem
-                )
-                for ei in range(n_total_elem):
-                    for zi in range(NZ):
-                        TMP_Pa_approx = P0_bar * 1.0e5 * 0.5
-                        Rc_seg[ei][zi] = self._rc(mc[ei][zi], TMP_Pa_approx)
-                        Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
-                        Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
-                        Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
+                if not cip_triggered:
+                    elapsed_deferred = year * 12
+                    cip_this_year = True
+                    cip_count_total += 1
+                    cip_events.append((year, f"Scheduled (Month {elapsed_deferred}) [post-snap]"))
+                    mc, Lb, delta_s, q_nom = self._apply_cip(
+                        mc, Lb, delta_s, q_nom, temp_c, n_total_elem
+                    )
+                    for ei in range(n_total_elem):
+                        for zi in range(NZ):
+                            TMP_Pa_approx = P0_bar * 1.0e5 * 0.5
+                            Rc_seg[ei][zi] = self._rc(mc[ei][zi], TMP_Pa_approx)
+                            Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
+                            Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
+                            Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
+                    snap["cip_count"] = cip_count_total
                 _deferred_cip = False
-                snap["cip_count"] = cip_count_total
 
             # ---- Compute Element Autopsy & Mechanism Totals (PRE-REPLACEMENT) ----
             # We must compute this before the replacement trigger resets all arrays to 0
@@ -1276,10 +1332,45 @@ class PhysicsAgingEngine:
         Rs_elem   = [sum(Rs_seg[ei]) / NZ for ei in range(n_total_elem)]
         Rn_elem   = [sum(Rn_seg[ei]) / NZ for ei in range(n_total_elem)]
 
+        # ---- CEOP Calculation setup ----------------------------------
+        # Calculate average flux and osmotic pressure for CEOP estimation
+        _n_elem_actual = sum(vessels_per_stage) * elements_per_vessel
+        Jw_avg = (Q0 / max(membrane["active_area_m2"] * _n_elem_actual, 1e-6)) / 3600.0
+        pi_feed_bar = self.ro_engine._calculate_osmotic_pressure(feed_ions, temp_c)
+        if year == 1:
+            print(f"DEBUG: pi_feed_bar = {pi_feed_bar}")
+        pi_feed_Pa = pi_feed_bar * 1.0e5
+        kM_avg = 5.0e-6
+        Ds_T = 1.6e-9 * ((temp_c + 273.15) / 298.15)
+        tau_bf = 2.0
+        eps_bf = 0.70
+        rho_cake = self.p.get("rho_cake", 2000.0)
+        eps_cake = self.p.get("eps_cake", 0.40)
+        tau_cake = 1.0 / eps_cake
+        mu_T = 8.9e-4 * math.exp(2500.0 * (1.0/(temp_c+273.15) - 1.0/298.15))
+        CP_clean = _safe_exp(Jw_avg / kM_avg)
+
         # ---- FRI per element -----------------------------------------
         FRI_list  = []
         for ei in range(n_total_elem):
-            Rf_foul  = Rc_elem[ei] + Rb_elem[ei] + Rs_elem[ei] + Rn_elem[ei]
+            # Calculate CEOP equivalent hydraulic resistance
+            Lb_avg_ei = sum(Lb[ei]) / NZ
+            mc_avg_ei = sum(mc[ei]) / NZ
+            Lc_avg_ei = mc_avg_ei / (rho_cake * (1.0 - eps_cake) + 1e-6)
+            
+            R_mt_bf = (Lb_avg_ei * tau_bf) / (Ds_T * eps_bf + 1e-30)
+            R_mt_cake = (Lc_avg_ei * tau_cake) / (Ds_T * eps_cake + 1e-30)
+            
+            # Cap exponent to avoid overflow at extreme fouling
+            exponent_fl = min(Jw_avg * (1.0/kM_avg + R_mt_bf + R_mt_cake), 15.0)
+            CP_fouled = _safe_exp(exponent_fl)
+            
+            # Cap the CEOP multiplier to avoid unphysical explosions at extreme flux
+            cp_delta = max(0.0, min(CP_fouled - CP_clean, 15.0))
+            delta_pi_CEOP = pi_feed_Pa * cp_delta
+            R_ceop_ei = delta_pi_CEOP / (mu_T * Jw_avg + 1e-30)
+
+            Rf_foul  = Rc_elem[ei] + Rb_elem[ei] + Rs_elem[ei] + Rn_elem[ei] + R_ceop_ei
             Rf_total = Rf_foul + Rcomp_elem[ei]
             fri = Rf_foul / (Rm_base + Rf_foul + 1e-30)
             FRI_list.append(fri)
@@ -1293,11 +1384,25 @@ class PhysicsAgingEngine:
                 ei = s_idx * elements_per_vessel + e_idx
                 if ei >= n_total_elem:
                     continue
-                # A_eff accounts for total resistance increase
+                # A_eff accounts for total resistance increase (including CEOP)
+                # Recompute CEOP for this element to include it in Rf_ei
+                Lb_avg_ei = sum(Lb[ei]) / NZ
+                mc_avg_ei = sum(mc[ei]) / NZ
+                Lc_avg_ei = mc_avg_ei / (rho_cake * (1.0 - eps_cake) + 1e-6)
+                R_mt_bf = (Lb_avg_ei * tau_bf) / (Ds_T * eps_bf + 1e-30)
+                R_mt_cake = (Lc_avg_ei * tau_cake) / (Ds_T * eps_cake + 1e-30)
+                exponent_fl = min(Jw_avg * (1.0/kM_avg + R_mt_bf + R_mt_cake), 15.0)
+                CP_fouled = _safe_exp(exponent_fl)
+                cp_delta = max(0.0, min(CP_fouled - CP_clean, 15.0))
+                delta_pi_CEOP = pi_feed_Pa * cp_delta
+                R_ceop_ei = delta_pi_CEOP / (mu_T * Jw_avg + 1e-30)
+                if year == 1 and ei == 0:
+                    print(f"DEBUG CEOP: Lb={Lb_avg_ei:.2e} CP_cln={CP_clean:.2f} CP_fl={CP_fouled:.2f} dPi_bar={delta_pi_CEOP/1e5:.2f} R_ceop={R_ceop_ei:.2e} Rm={Rm_base:.2e}")
+
                 Rf_ei  = (Rc_elem[ei] + Rb_elem[ei]
-                          + Rs_elem[ei] + Rn_elem[ei] + Rcomp_elem[ei])
-                FRI_ei = Rf_ei / (Rm_base + Rf_ei + 1e-30)
-                A_eff  = A0_lmh_bar / (1.0 + FRI_ei) * (1.0 - eps_comp[ei])
+                          + Rs_elem[ei] + Rn_elem[ei] + Rcomp_elem[ei] + R_ceop_ei)
+                FRI_ei = (Rf_ei - Rcomp_elem[ei]) / (Rm_base + Rf_ei - Rcomp_elem[ei] + 1e-30)
+                A_eff  = A0_lmh_bar / (1.0 + Rf_ei / (Rm_base + 1e-30)) * (1.0 - eps_comp[ei])
                 A_eff  = max(A_eff, A0_lmh_bar * 0.1)
 
                 B_eff  = B0_ms * B_rel[ei]
@@ -1318,7 +1423,8 @@ class PhysicsAgingEngine:
                 )
                 rec_mid = res["summary"]["total_recovery"]
                 best_result = res
-                if abs(rec_mid - target_rec) < 5e-4:
+                # Tighten tolerance to 1e-5 to accurately capture small pressure increases (e.g. from compaction)
+                if abs(rec_mid - target_rec) < 1e-5:
                     break
                 if rec_mid < target_rec:
                     P_lo = P_mid
