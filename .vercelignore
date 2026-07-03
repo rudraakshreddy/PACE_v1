@@ -1,0 +1,21 @@
+# Ignore everything by default
+*
+
+# But allow the backend and UI folders
+!backend/
+!ui_ux_design/
+
+# Allow essential config files
+!vercel.json
+!requirements.txt
+
+# But ignore docs and scratch within those allowed folders just in case
+backend/*.pdf
+backend/*.docx
+backend/scratch*/
+ui_ux_design/*.pdf
+ui_ux_design/*.docx
+
+# Ignore all python caches
+__pycache__/
+*.pyc
