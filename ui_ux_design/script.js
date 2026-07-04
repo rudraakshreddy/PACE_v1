@@ -3859,8 +3859,8 @@ document.addEventListener('DOMContentLoaded', () => {
     designInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener('input', autoDesignVesselArray);
-            el.addEventListener('change', autoDesignVesselArray);
+            // el.addEventListener('input', autoDesignVesselArray);
+            // el.addEventListener('change', autoDesignVesselArray);
         }
     });
 
@@ -4022,7 +4022,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         interval_months: parseInt(safeVal('phys-cip-interval', 0)),
                         duration_h: 4.0
                     };
-                    payload.antiscalant_dosed = safeStr('phys-antiscalant', 'true') === 'true';
+                    const agingCheckbox = document.getElementById('aging-antiscalant');
+                    const physDropdown = document.getElementById('phys-antiscalant');
+                    let asDosed = true;
+                    if (agingCheckbox && agingCheckbox.offsetParent !== null) {
+                        asDosed = agingCheckbox.checked;
+                    } else if (physDropdown) {
+                        asDosed = physDropdown.value === 'true';
+                    } else if (agingCheckbox) {
+                        asDosed = agingCheckbox.checked;
+                    }
+                    payload.antiscalant_dosed = asDosed;
                 }
 
                 const url = isPhysics ? API_BASE + '/api/calculate-system-physics' : API_BASE + '/api/calculate-system';
@@ -5313,7 +5323,7 @@ window.renderPhysicsResults = function(data) {
 
         // FRI, B_Rel, Recovery, TDS, SEC, CIPs
         setText('phys-card-fri',  cur.fri.toFixed(3));
-        setText('phys-card-brel', cur.b_relative.toFixed(3));
+        setText('phys-card-brel', cur.b_irr.toFixed(3));
         setText('phys-card-rec',  (cur.recovery * 100).toFixed(1));
         setText('phys-card-tds',  cur.perm_tds.toFixed(1));
         setText('phys-card-sec',  cur.sec_kwh_m3.toFixed(2));
@@ -5328,7 +5338,7 @@ window.renderPhysicsResults = function(data) {
             const style = isSel ? 'background: rgba(99, 102, 241, 0.08); font-weight: 600;' : '';
             return `
                 <tr style="${style}">
-                    <td><strong>Year ${s.year}</strong></td>
+                    <td><strong>Year ${s.year}</strong>${s.replacement_triggered ? ' <span title="Membranes were automatically replaced due to severe fouling (NPF < 0.70)" style="color: #ef4444; font-size: 0.65rem; background: rgba(239, 68, 68, 0.1); padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem; border: 1px solid rgba(239, 68, 68, 0.2); cursor: help;">REPLACED</span>' : ''}</td>
                     <td>${s.perm_flow.toFixed(2)}</td>
                     <td>${(s.recovery * 100).toFixed(1)}%</td>
                     <td>${s.feed_pressure_bar.toFixed(1)}</td>
@@ -5337,7 +5347,7 @@ window.renderPhysicsResults = function(data) {
                     <td>${s.npf.toFixed(4)}</td>
                     <td>${s.nsp.toFixed(4)}</td>
                     <td>${s.fri.toFixed(3)}</td>
-                    <td>${s.b_relative.toFixed(3)}</td>
+                    <td>${s.b_irr.toFixed(3)}</td>
                     <td><span style="padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; background: var(--input-bg); color: var(--text-primary); text-transform: capitalize; border: 1px solid var(--input-border);">${s.dominant_mechanism.replace('_', ' ')}</span></td>
                     <td>${s.ndp_ratio.toFixed(3)}</td>
                 </tr>

@@ -107,9 +107,9 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
     "chelant_conc": 0.05,     # chelant concentration [M]
 
     # CIP trigger thresholds (ASTM / industry standard)
-    "NPF_cip_trigger":     0.85,
+    "NPF_cip_trigger":     0.90,  # 10% drop
     "NDP_ratio_cip_trigger": 1.15,
-    "NSP_ratio_cip_trigger": 1.20,
+    "NSP_ratio_cip_trigger": 1.10,
     "FRI_cip_trigger":     0.60,
 
     # Membrane replacement thresholds
@@ -155,9 +155,6 @@ DEFAULT_PHYSICS_PARAMS.update({
     "Em":          2.0e8,        # elastic modulus [Pa]
     "f_stress":    0.50,         # fraction of feed P as compressive stress
     "tau_c":       500.0,        # retardation time [h] — faster compaction saturation
-
-    # CIP thresholds
-    "FRI_cip_trigger":     0.60,  # trigger CIP when FRI > 60%
 
     # Replacement
     "SEC_replace_trigger": 1.50,  # 50% SEC increase
@@ -361,6 +358,39 @@ class PhysicsAgingEngine:
         _CP_log10_0 = math.log10(max(_CP0, 1.0))
         _CP_log10_0 = max(0.0, min(_CP_log10_0, 0.7))   # physical cap at CP≈5
         # Wall SI = Bulk SI + log10(CP). All 1:1 electrolytes get same shift.
+        
+        # ---- Section 8: Calibration Fallbacks ------------------------
+        sys_flux_lmh = _Jw0 * 3600.0 * 1000.0
+        
+        # 8.3: Deposition rate vs design flux category
+        df_table = membrane.get("design_flux_table", {})
+        if df_table:
+            applicable_ceiling = 25.0
+            for k, v in df_table.items():
+                if v.get("sdi_max", 5) >= sdi:
+                    applicable_ceiling = max(applicable_ceiling, v.get("flux_max_lmh", 25.0))
+            flux_ratio = max(1.0, sys_flux_lmh / applicable_ceiling)
+            self.p["Kd"] *= flux_ratio
+
+        # 8.5: Fouling-resistance class multiplier
+        surf_class = membrane.get("surface_class", {})
+        if surf_class.get("fouling_resistant_claim", False):
+            f_class = 0.70
+            self.p["Kd"] *= f_class
+            self.p["mu_max"] *= f_class
+
+        # 8.6: Compaction stiffness estimate
+        op_limits = membrane.get("operating_limits", {})
+        max_p_bar = op_limits.get("max_pressure")
+        if max_p_bar:
+            self.p["Em"] = 1.0e8 * (max_p_bar / 41.4)
+            
+        # 8.7: Chlorine-degradation rate
+        max_cl = op_limits.get("max_chlorine")
+        if max_cl is not None and max_cl > 0:
+            self.p["kB_chem"] = 0.03 * (0.1 / max_cl)
+
+        # 8.4 is handled during induction time logic (since it depends on dynamic wall SI)
 
         _si_calc_bulk =  0.50
         _si_gyps_bulk = -1.20
@@ -376,6 +406,8 @@ class PhysicsAgingEngine:
         self.si_gyps_bulk = _si_gyps_bulk
         self.si_bari_bulk = _si_bari_bulk
         self.si_sili_bulk = _si_sili_bulk
+        
+        self.p["sat_limits"] = membrane.get("saturation_limits", {})
 
         year0: dict = {
             "year":                 0,
@@ -388,7 +420,7 @@ class PhysicsAgingEngine:
             "nsp":                  1.0,
             "ndp_ratio":            1.0,
             "fri":                  0.0,
-            "b_relative":           1.0,
+            "b_irr":           1.0,
             "rc_avg":               0.0,
             "rb_avg":               0.0,
             "rs_avg":               0.0,
@@ -468,7 +500,7 @@ class PhysicsAgingEngine:
 
         # Element-uniform states
         eps_comp = [0.0]*n_total_elem   # compaction strain [-]
-        B_rel    = [1.0]*n_total_elem   # relative B factor
+        B_IRR    = [1.0]*n_total_elem   # relative B factor
         t_op_h   = [0.0]*n_total_elem   # cumulative operation [h]
 
         # Tracking
@@ -513,7 +545,7 @@ class PhysicsAgingEngine:
             # Cache: store per-month intermediate state for DEFERRED monthly emission.
             # We CANNOT emit monthly pressure until we know P_end_this_year from
             # the year-end bisection (which runs AFTER all 12 ODE steps).
-            # Each entry: (elapsed_months, FRI_avg, B_rel_avg, cip_event_flag)
+            # Each entry: (elapsed_months, FRI_avg, B_IRR_avg, cip_event_flag)
             month_cache: List[dict] = []
 
             # Accumulators for annual average state
@@ -534,7 +566,7 @@ class PhysicsAgingEngine:
                 seg_results = self._spatial_transport(
                     feed_flow_m3h, P_curr_bar, effective_feed_ions, temp_c, membrane,
                     stages, vessels_per_stage, elements_per_vessel,
-                    Rc_seg, Rb_seg, Rs_seg, Rn_seg, Rcomp_elem, B_rel,
+                    Rc_seg, Rb_seg, Rs_seg, Rn_seg, Rcomp_elem, B_IRR,
                     eps_comp, Rm_base, dh, t_fs, w_total, eps_ch, length_m
                 )
 
@@ -641,7 +673,7 @@ class PhysicsAgingEngine:
                     kB_eff = (self.p["kB_chem"]
                               * _arrhenius(self.p["Ea_B"], T_K, self.p["T_ref_B"])
                               / 12.0)                          # per month
-                    B_rel[ei] = min(3.0, B_rel[ei] * (1.0 + kB_eff))
+                    B_IRR[ei] = min(3.0, B_IRR[ei] * (1.0 + kB_eff))
 
                     # ---- Compaction resistance -------------------------
                     Rcomp_elem[ei] = eps_comp[ei] * Rm_base
@@ -664,12 +696,11 @@ class PhysicsAgingEngine:
                         _deferred_cip = True
                         scheduled_cip = False   # do NOT apply inside the loop
                     else:
-                        # Mid-year CIP — apply immediately as normal
                         cip_this_year = True
                         cip_count_total += 1
-                        cip_events.append((year, f"Scheduled (Month {elapsed_months})"))
+                        cip_events.append((year, elapsed_months, "Scheduled"))
                         mc, Lb, delta_s, q_nom = self._apply_cip(
-                            mc, Lb, delta_s, q_nom, temp_c, n_total_elem
+                            mc, Lb, delta_s, q_nom, temp_c, n_total_elem, elapsed_months
                         )
                         for ei in range(n_total_elem):
                             for zi in range(NZ):
@@ -692,7 +723,7 @@ class PhysicsAgingEngine:
                     Rf_total_m = Rf_foul_m + Rcomp_elem[ei]
                     FRI_list_m.append(Rf_foul_m / (Rm_base + Rf_foul_m + 1e-30))
                 FRI_avg_m   = sum(FRI_list_m) / n_total_elem
-                B_rel_avg_m = sum(B_rel) / n_total_elem
+                B_IRR_avg_m = sum(B_IRR) / n_total_elem
                 flux_lmh_m  = (sum(
                     sum(seg_results[ei][zi]["Jw"] for zi in range(NZ)) / NZ
                     for ei in range(n_total_elem)
@@ -702,7 +733,7 @@ class PhysicsAgingEngine:
                     "elapsed_months": elapsed_months,
                     "month_in_year":  month,          # 0-11
                     "FRI_avg":        FRI_avg_m,
-                    "B_rel_avg":      B_rel_avg_m,
+                    "B_IRR_avg":      B_IRR_avg_m,
                     "flux_lmh":       flux_lmh_m,
                     "cip_event":      scheduled_cip,
                 })
@@ -715,7 +746,7 @@ class PhysicsAgingEngine:
                 vessels_per_stage, elements_per_vessel, feed_flow_m3h,
                 target_recovery_pct, P0_bar, Q0, TDS0, NDP_0, SEC0,
                 Rc_seg_avg, Rb_seg_avg, Rs_seg_avg, Rn_seg_avg, Rcomp_elem,
-                B_rel, eps_comp, Rm_base, A0_lmh_bar, B0_ms,
+                B_IRR, eps_comp, Rm_base, A0_lmh_bar, B0_ms,
                 n_total_elem, t_SI, delta_s_avg, Lb_avg, mc_avg, q_nom_avg,
                 cip_count_total, membrane
             )
@@ -723,41 +754,8 @@ class PhysicsAgingEngine:
 
             # ---- CIP decision ----------------------------------------
             p = self.p
-            P_ratio = snap["feed_pressure_bar"] / max(P0_bar, 0.1)
-            cip_triggered = (
-                snap["npf"]   < p["NPF_cip_trigger"]  or
-                P_ratio       > 1.35                   or
-                snap["fri"]   > p["FRI_cip_trigger"]
-            )
-
-            if cip_triggered:
-                cip_this_year = True
-                cip_count_total += 1
-                cip_events.append((year, "acid_alkaline"))
-                mc, Lb, delta_s, q_nom = self._apply_cip(
-                    mc, Lb, delta_s, q_nom, temp_c, n_total_elem
-                )
-                for ei in range(n_total_elem):
-                    for zi in range(NZ):
-                        TMP_Pa_approx = P0_bar * 1.0e5 * 0.5
-                        Rc_seg[ei][zi] = self._rc(mc[ei][zi], TMP_Pa_approx)
-                        Rb_seg[ei][zi] = self._rb(Lb[ei][zi])
-                        Rs_seg[ei][zi] = self._rs(delta_s[ei][zi])
-                        Rn_seg[ei][zi] = self._rn(q_nom[ei][zi])
-                
-                # If CIP triggered at end of year, we re-run snapshot with the CLEANED state
-                # because the CIP fundamentally resets the membrane for the new year.
-                snap = self._year_end_snapshot(
-                    year, effective_feed_ions, temp_c, membrane_model, stages,
-                    vessels_per_stage, elements_per_vessel, feed_flow_m3h,
-                    target_recovery_pct, P0_bar, Q0, TDS0, NDP_0, SEC0,
-                    Rc_seg, Rb_seg, Rs_seg, Rn_seg, Rcomp_elem,
-                    B_rel, eps_comp, Rm_base, A0_lmh_bar, B0_ms,
-                    n_total_elem, t_SI, delta_s, Lb, mc, q_nom,
-                    cip_count_total, membrane
-                )
-                snap["cip_triggered"] = True
-                snap["cip_count"]     = cip_count_total
+            # Auto-CIP feature removed per user request.
+            cip_triggered = False
 
             # ---- Apply deferred end-of-year scheduled CIP (AFTER snapshot) -----
             # A scheduled CIP that fell on month 12 was deferred so the snapshot
@@ -768,9 +766,9 @@ class PhysicsAgingEngine:
                     elapsed_deferred = year * 12
                     cip_this_year = True
                     cip_count_total += 1
-                    cip_events.append((year, f"Scheduled (Month {elapsed_deferred}) [post-snap]"))
+                    cip_events.append((year, elapsed_deferred, "Scheduled [post-snap]"))
                     mc, Lb, delta_s, q_nom = self._apply_cip(
-                        mc, Lb, delta_s, q_nom, temp_c, n_total_elem
+                        mc, Lb, delta_s, q_nom, temp_c, n_total_elem, elapsed_deferred
                     )
                     for ei in range(n_total_elem):
                         for zi in range(NZ):
@@ -835,7 +833,7 @@ class PhysicsAgingEngine:
                 q_nom       = [[0.0]*NZ for _ in range(n_total_elem)]
                 t_SI        = [[0.0]*NZ for _ in range(n_total_elem)]
                 eps_comp    = [0.0]*n_total_elem
-                B_rel       = [1.0]*n_total_elem
+                B_IRR       = [1.0]*n_total_elem
                 t_op_h      = [0.0]*n_total_elem
                 Rc_seg      = [[0.0]*NZ for _ in range(n_total_elem)]
                 Rb_seg      = [[0.0]*NZ for _ in range(n_total_elem)]
@@ -867,9 +865,9 @@ class PhysicsAgingEngine:
                 npf_m    = NPF_start_this_year + (NPF_end_this_year - NPF_start_this_year) * t_frac
                 npf_m    = max(0.0, min(2.0, npf_m))   # allow slight >1 for unfouled periods
 
-                # NSP (Normalised Salt Passage): starts at 1.0, increases with B_rel
-                # B_rel > 1 means more salt passes → NSP > 1  (consistent with Year-wise tab)
-                nsp_m    = max(1.0, mc_entry["B_rel_avg"])
+                # NSP (Normalised Salt Passage): starts at 1.0, increases with B_IRR
+                # B_IRR > 1 means more salt passes → NSP > 1  (consistent with Year-wise tab)
+                nsp_m    = max(1.0, mc_entry["B_IRR_avg"])
 
                 monthly_profile.append({
                     "month":         mc_entry["elapsed_months"],
@@ -938,7 +936,7 @@ class PhysicsAgingEngine:
         self,
         feed_flow_m3h, Pfeed_bar, feed_ions, temp_c, membrane,
         stages, vessels_per_stage, elements_per_vessel,
-        Rc_seg, Rb_seg, Rs_seg, Rn_seg, Rcomp_elem, B_rel,
+        Rc_seg, Rb_seg, Rs_seg, Rn_seg, Rcomp_elem, B_IRR,
         eps_comp, Rm_base, dh, t_fs, w_total, eps_ch, length_m
     ) -> list:
         """
@@ -1163,7 +1161,34 @@ class PhysicsAgingEngine:
         S   = 10.0 ** si_w                    # supersaturation ratio
         lnS = math.log(max(S, 1.001))         # ln(S) — physically correct
         dG_kT = f_het * 4.0 / (3.0 * lnS**2)
-        t_ind_base = p["A_ind"] * _safe_exp(dG_kT) * t_ind_factor / 3600.0  # hours
+        
+        # 8.4 Scaling induction time vs. published saturation limits
+        sat_limits = p.get("sat_limits", {})
+        if sat_limits:
+            exceeded = False
+            # We approximate concentrate-side value for indices based on CP
+            # LSI approx = bulk LSI + log10(CP)
+            # When antiscalant is OFF (t_ind_factor <= 1.0), strict thermodynamic limits apply
+            lsi_limit   = sat_limits["LSI"] if t_ind_factor > 1.0 else 0.0
+            sdsi_limit  = sat_limits.get("SDSI", 0.0) if t_ind_factor > 1.0 else 0.0
+            caso4_limit = sat_limits.get("CaSO4_pct", 100.0) if t_ind_factor > 1.0 else 100.0
+            baso4_limit = sat_limits.get("BaSO4_pct", 100.0) if t_ind_factor > 1.0 else 100.0
+            sio2_limit  = sat_limits.get("SiO2_pct", 100.0) if t_ind_factor > 1.0 else 100.0
+
+            if "LSI" in sat_limits and (self.si_calc_bulk + si_enh) > lsi_limit: exceeded = True
+            if "SDSI" in sat_limits and (self.si_calc_bulk + si_enh - 0.2) > sdsi_limit: exceeded = True
+            # For % limits, we can use S * 100
+            if "CaSO4_pct" in sat_limits and (10.0**(self.si_gyps_bulk + si_enh) * 100) > caso4_limit: exceeded = True
+            if "BaSO4_pct" in sat_limits and (10.0**(self.si_bari_bulk + si_enh) * 100) > baso4_limit: exceeded = True
+            if "SiO2_pct" in sat_limits and (10.0**(self.si_sili_bulk + si_enh) * 100) > sio2_limit: exceeded = True
+            
+            if exceeded:
+                t_ind_base = 0.0 # collapses instantly
+            else:
+                t_ind_base = float('inf')
+        else:
+            # Fallback to literature default
+            t_ind_base = p["A_ind"] * _safe_exp(dG_kT) * t_ind_factor / 3600.0  # hours
 
         # t_SI accumulates elapsed time each timestep (in hours)
         dt_SI = 1.0
@@ -1174,10 +1199,10 @@ class PhysicsAgingEngine:
             SI_excess = max(0.0, S - 1.0)      # (S-1) is the true driving force
             # Antiscalant suppresses growth rate by 80% in addition to induction delay
             growth_suppression = 0.20 if t_ind_factor > 1.0 else 1.0
+            # kg_calcite is already a linear growth rate [m/s], do not divide by density
             growth_rate = (
                 p["kg_calcite"]
                 * (SI_excess ** p["ns_calcite"])
-                / p["rho_calcite"]
                 * growth_suppression
             )
         else:
@@ -1246,47 +1271,63 @@ class PhysicsAgingEngine:
     def _apply_cip(
         self,
         mc: list, Lb: list, delta_s: list, q_nom: list,
-        temp_c: float, n_total_elem: int
+        temp_c: float, n_total_elem: int, elapsed_months: int = 1
     ):
         """
-        Apply CIP to all elements.  Returns updated state lists.
-        Acid CIP:    removes delta_s (scale) and mc (colloids)
-        Alkaline CIP: removes Lb (biofilm) and q_nom (NOM)
+        Apply CIP to all elements using a sequential two-step protocol (alkaline, then acid)
+        with foulant-specific affinity matrices and maturation penalty.
         """
         p   = self.p
-        T_K = temp_c + 273.15
+        import math
+        
+        # Maturation penalty (eta_age)
+        eta_min = 0.6
+        tau_age = 15.0 # months
+        eta_age = eta_min + (1.0 - eta_min) * math.exp(-elapsed_months / tau_age)
 
-        # Acid CIP – scale dissolution
+        # Base dissolution rates
+        # Using the existing parameters for temperature scaling
+        T_K = temp_c + 273.15
         arr_dis  = _arrhenius(p["Ea_dis"],     T_K, p["T_cip"])
-        # Alkaline CIP – biofilm and NOM removal
         arr_bio  = _arrhenius(p["Ea_bio_rem"], T_K, p["T_cip"])
 
-        # H+ activity at acid CIP
         H_acid   = 10.0 ** (-p["cip_ph_acid"])
-        # OH- activity at alkaline CIP
         OH_alk   = 10.0 ** (-(14.0 - p["cip_ph_alk"]))
+
+        # Step durations (hours)
+        t_alk = p["tCIP_alk"]
+        t_acid = p["tCIP_acid"]
+
+        # Affinity Matrix (k_dis_X_j): Base kinetics scaled by affinity
+        # Lb (Biofilm): Alkaline primary, Acid negligible
+        k_Lb_alk = p["kd_bio"] * arr_bio * OH_alk
+        k_Lb_acid = 0.01 * k_Lb_alk
+        
+        # q (NOM): Alkaline primary, Acid secondary
+        k_q_alk = p["kd_NOM"] * arr_bio * OH_alk
+        k_q_acid = 0.2 * k_q_alk
+        
+        # delta_s (Scale): Alkaline negligible, Acid primary
+        k_ds_acid = p["kd_acid"] * arr_dis * H_acid
+        k_ds_alk = 0.01 * k_ds_acid
+        
+        # mc (Cake): Alkaline secondary, Acid secondary
+        k_mc_acid = p["kd_coll"] * p["chelant_conc"]
+        k_mc_alk = 0.5 * k_mc_acid
 
         for ei in range(n_total_elem):
             for zi in range(NZ):
-                # Acid: dissolve scale  (exponential decay with CIP duration)
-                k_diss  = p["kd_acid"] * arr_dis * H_acid
-                eff_ds  = _safe_exp(-k_diss * p["tCIP_acid"] * 3600.0)
-                delta_s[ei][zi] *= eff_ds
-
-                # Acid: colloidal cake removal by chelant
-                k_coll  = p["kd_coll"] * p["chelant_conc"]
-                eff_mc  = _safe_exp(-k_coll * p["tCIP_acid"] * 3600.0)
-                mc[ei][zi] *= eff_mc
-
-                # Alkaline: biofilm removal
-                k_bio_r  = p["kd_bio"] * arr_bio * OH_alk
-                eff_Lb   = _safe_exp(-k_bio_r * p["tCIP_alk"] * 3600.0)
-                Lb[ei][zi] *= eff_Lb
-
-                # Alkaline: NOM hydrolysis
-                k_nom_r  = p["kd_NOM"] * arr_bio * OH_alk
-                eff_q    = _safe_exp(-k_nom_r * p["tCIP_alk"] * 3600.0)
-                q_nom[ei][zi] *= eff_q
+                # ALKALINE STEP
+                Lb[ei][zi] *= _safe_exp(-k_Lb_alk * eta_age * t_alk * 3600.0)
+                q_nom[ei][zi] *= _safe_exp(-k_q_alk * eta_age * t_alk * 3600.0)
+                delta_s[ei][zi] *= _safe_exp(-k_ds_alk * eta_age * t_alk * 3600.0)
+                mc[ei][zi] *= _safe_exp(-k_mc_alk * eta_age * t_alk * 3600.0)
+                
+                # ACID STEP
+                Lb[ei][zi] *= _safe_exp(-k_Lb_acid * eta_age * t_acid * 3600.0)
+                q_nom[ei][zi] *= _safe_exp(-k_q_acid * eta_age * t_acid * 3600.0)
+                delta_s[ei][zi] *= _safe_exp(-k_ds_acid * eta_age * t_acid * 3600.0)
+                mc[ei][zi] *= _safe_exp(-k_mc_acid * eta_age * t_acid * 3600.0)
 
         return mc, Lb, delta_s, q_nom
 
@@ -1312,7 +1353,7 @@ class PhysicsAgingEngine:
         SEC0: float,
         Rc_seg: list, Rb_seg: list, Rs_seg: list, Rn_seg: list,
         Rcomp_elem: list,
-        B_rel: list, eps_comp: list,
+        B_IRR: list, eps_comp: list,
         Rm_base: float,
         A0_lmh_bar: float,
         B0_ms: float,
@@ -1405,7 +1446,7 @@ class PhysicsAgingEngine:
                 A_eff  = A0_lmh_bar / (1.0 + Rf_ei / (Rm_base + 1e-30)) * (1.0 - eps_comp[ei])
                 A_eff  = max(A_eff, A0_lmh_bar * 0.1)
 
-                B_eff  = B0_ms * B_rel[ei]
+                B_eff  = B0_ms * B_IRR[ei]
                 aged_params[(s_idx + 1, e_idx + 1)] = {"A": A_eff, "B": B_eff}
 
         # ---- Bisection: find feed pressure for target recovery -------
@@ -1491,14 +1532,14 @@ class PhysicsAgingEngine:
         NPF = (Qp_y / max(Q0, 1e-6)) * TCF_ratio * (NDP_0 / NDP_y_safe)
         NPF = max(0.0, min(NPF, 2.0))  # physical clamp
 
-        # ---- B_rel average across system ----------------------------
-        B_rel_avg = sum(B_rel) / n_total_elem
+        # ---- B_IRR average across system ----------------------------
+        B_IRR_avg = sum(B_IRR) / n_total_elem
 
         # To align with industry standard projections where permeate TDS
         # tracks chemical degradation (B-value increase) without being fully
         # suppressed by system-level hydraulic flux flattening, we explicitly
         # scale the salt passage by the average chemical degradation factor.
-        TDS_y = s["perm_tds"] * B_rel_avg
+        TDS_y = s["perm_tds"] * B_IRR_avg
 
         # NSP: ASTM D4516-19a normalised salt passage — constant-flow mode
         #
@@ -1509,9 +1550,9 @@ class PhysicsAgingEngine:
         NSP_total   = SP_y / SP0
         NSP_total   = max(0.0, NSP_total)
 
-        # Fouling-only NSP (B_rel contribution isolated):
+        # Fouling-only NSP (B_IRR contribution isolated):
         # Removing chemical degradation leaves the concentration-polarisation-driven component.
-        NSP_fouling = NSP_total / max(B_rel_avg, 1e-6)
+        NSP_fouling = NSP_total / max(B_IRR_avg, 1e-6)
         NSP = NSP_total
 
         # ---- Wall-level SI indicators (Jw/kM concentration polarisation) ---
@@ -1550,7 +1591,7 @@ class PhysicsAgingEngine:
         Rn_avg_g = sum(Rn_elem) / n_total_elem
         Rk_avg_g = sum(Rcomp_elem) / n_total_elem
 
-        # (B_rel_avg calculated above)
+        # (B_IRR_avg calculated above)
         return {
             "year":                 year,
             "perm_flow":            Qp_y,
@@ -1560,10 +1601,10 @@ class PhysicsAgingEngine:
             "sec_kwh_m3":           SEC_y,
             "npf":                  NPF,
             "nsp":                  NSP,              # total NSP: 1.0=baseline, >1=salt passage worsening
-            "nsp_fouling":          NSP_fouling,      # fouling-only NSP (excl. chemical B_rel degradation)
+            "nsp_fouling":          NSP_fouling,      # fouling-only NSP (excl. chemical B_IRR degradation)
             "ndp_ratio":            NDP_ratio,
             "fri":                  FRI_sys,
-            "b_relative":           B_rel_avg,
+            "b_irr":           B_IRR_avg,
             "rc_avg":               Rc_avg_g,
             "rb_avg":               Rb_avg_g,
             "rs_avg":               Rs_avg_g,
@@ -1619,7 +1660,7 @@ class PhysicsAgingEngine:
             "nsp":                  degrade,
             "ndp_ratio":            1.0 + FRI * 0.3,
             "fri":                  FRI,
-            "b_relative":           1.0,
+            "b_irr":           1.0,
             "rc_avg":               sum(Rc_elem) / max(n_total_elem, 1),
             "rb_avg":               sum(Rb_elem) / max(n_total_elem, 1),
             "rs_avg":               sum(Rs_elem) / max(n_total_elem, 1),

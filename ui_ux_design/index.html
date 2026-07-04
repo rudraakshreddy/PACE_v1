@@ -1033,7 +1033,7 @@
                             </div>
                             <div class="input-group">
                                 <label>Antiscalant Dosed</label>
-                                <select id="phys-antiscalant">
+                                <select id="phys-antiscalant" onchange="const cb = document.getElementById('aging-antiscalant'); if(cb) cb.checked = (this.value === 'true');">
                                     <option value="true">Yes</option>
                                     <option value="false">No</option>
                                 </select>
@@ -1787,7 +1787,7 @@
                     </div>
                     <div style="padding: 0.4rem 0;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.82rem; color: var(--text-muted);">
-                            <input type="checkbox" id="aging-antiscalant" checked style="accent-color: var(--accent); width: 16px; height: 16px;">
+                            <input type="checkbox" id="aging-antiscalant" checked style="accent-color: var(--accent); width: 16px; height: 16px;" onchange="const dd = document.getElementById('phys-antiscalant'); if(dd) dd.value = this.checked ? 'true' : 'false';">
                             Antiscalant Dosed
                         </label>
                     </div>

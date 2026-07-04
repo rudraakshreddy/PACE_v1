@@ -41,7 +41,7 @@ assert abs(y0['perm_flow'] - 45.0) < 1e-6, f"Year 0 flow={y0['perm_flow']}"
 assert abs(y0['feed_pressure_bar'] - 12.0) < 1e-6, f"Year 0 pressure={y0['feed_pressure_bar']}"
 assert len(snaps) == 6, f"Expected 6, got {len(snaps)}"
 
-required_keys = ['year','npf','nsp','fri','b_relative','perm_flow','recovery',
+required_keys = ['year','npf','nsp','fri','b_irr','perm_flow','recovery',
     'feed_pressure_bar','perm_tds','sec_kwh_m3','rc_avg','rb_avg','rs_avg','rn_avg',
     'rcomp','si_calcite_wall','si_gypsum_wall','si_barite_wall','si_silica_wall',
     'cip_triggered','replacement_triggered']

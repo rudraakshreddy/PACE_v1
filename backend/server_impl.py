@@ -932,6 +932,8 @@ def _run_projection_core(
         bulk_si             = bulk_si,
     )
 
+    # Auto-CIP forecast logic removed per user request.
+
     # Ensure physics engine snapshots reflect the TRUE system recovery/flow (vital for 2P-RO)
     if "annual_snapshots" in physics_results:
         # Extract baseline metrics, supporting both 1-Pass (summary) and 2-Pass (system_summary)
@@ -1137,7 +1139,7 @@ def calculate_system_physics(data: PhysicsCalcInput):
                 summ["npf"]               = sel["npf"]
                 summ["nsp"]               = sel["nsp"]
                 summ["fri"]               = sel["fri"]
-                summ["b_relative"]        = sel["b_relative"]
+                summ["b_irr"]        = sel["b_irr"]
                 summ["physics_year"]      = selected_year
 
                 pass2_res = result.get("pass2_results")
@@ -1149,7 +1151,7 @@ def calculate_system_physics(data: PhysicsCalcInput):
                     p2_summ["npf"] = sel["npf"]
                     p2_summ["nsp"] = sel["nsp"]
                     p2_summ["fri"] = sel["fri"]
-                    p2_summ["b_relative"] = sel["b_relative"]
+                    p2_summ["b_irr"] = sel["b_irr"]
                     p2_summ["physics_year"] = selected_year
 
         result["physics_results"] = physics_results

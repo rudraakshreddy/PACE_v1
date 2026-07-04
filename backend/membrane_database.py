@@ -912,7 +912,47 @@ class MembraneDatabase:
 
     @classmethod
     def get_ro_membrane(cls, name: str) -> Dict[str, Any]:
-        return cls.RO_MEMBRANES.get(name, cls.RO_MEMBRANES["BW30-400"])
+        raw_mem = cls.RO_MEMBRANES.get(name, cls.RO_MEMBRANES["BW30-400"])
+        return cls._normalize_membrane(raw_mem)
+
+    @classmethod
+    def _normalize_membrane(cls, raw_mem: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalizes any catalog element into the 8.1 Membrane Datasheet Schema shape.
+        """
+        mem = raw_mem.copy()
+        
+        # 1. membrane_class
+        mem["membrane_class"] = mem.get("type", "BWRO")
+        
+        # 2. operating_limits
+        op_limits = mem.get("operating_limits", {})
+        op_limits.setdefault("max_pressure", mem.get("max_pressure_bar"))
+        op_limits.setdefault("max_temp", mem.get("max_temp_c"))
+        op_limits.setdefault("ph_range", mem.get("ph_range"))
+        op_limits.setdefault("cip_ph_range", mem.get("cip_ph_range"))
+        op_limits.setdefault("max_chlorine", mem.get("max_chlorine_mgL"))
+        op_limits.setdefault("max_sdi", mem.get("max_sdi_15"))
+        mem["operating_limits"] = op_limits
+
+        # 3. surface_class
+        surf_class = mem.get("surface_class", {})
+        flags = mem.get("flags", [])
+        surf_class.setdefault("fouling_resistant_claim", "LF" in flags or "FR" in flags or "low fouling" in str(mem.get("description", "")).lower())
+        surf_class.setdefault("hydrophilic", False)
+        surf_class.setdefault("material", mem.get("material", "PA"))
+        mem["surface_class"] = surf_class
+
+        # 4. active_area, nominal_rejection, nominal_flow
+        mem.setdefault("active_area", mem.get("active_area_m2"))
+        mem.setdefault("nominal_rejection", mem.get("nominal_rejection"))
+        mem.setdefault("nominal_flow", mem.get("max_feed_flow_m3h")) # Assuming max feed flow is a proxy if nominal flow missing
+
+        # 5. design_flux_table and saturation_limits (already used in HPA-4040, map from guidelines)
+        mem.setdefault("design_flux_table", mem.get("design_flux_guidelines", {}))
+        mem.setdefault("saturation_limits", mem.get("saturation_limits", {}))
+
+        return mem
 
     @classmethod
     def get_uf_module(cls, name: str) -> Dict[str, Any]:

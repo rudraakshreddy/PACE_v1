@@ -1117,7 +1117,7 @@ def calculate_system_physics(data: PhysicsCalcInput):
                 summ["npf"]               = sel["npf"]
                 summ["nsp"]               = sel["nsp"]
                 summ["fri"]               = sel["fri"]
-                summ["b_relative"]        = sel["b_relative"]
+                summ["b_irr"]        = sel["b_irr"]
                 summ["physics_year"]      = selected_year
 
                 pass2_res = result.get("pass2_results")
@@ -1129,7 +1129,7 @@ def calculate_system_physics(data: PhysicsCalcInput):
                     p2_summ["npf"] = sel["npf"]
                     p2_summ["nsp"] = sel["nsp"]
                     p2_summ["fri"] = sel["fri"]
-                    p2_summ["b_relative"] = sel["b_relative"]
+                    p2_summ["b_irr"] = sel["b_irr"]
                     p2_summ["physics_year"] = selected_year
 
         result["physics_results"] = physics_results

@@ -1211,8 +1211,8 @@ class ReportGenerator:
                  f"{sel.get('fri', 0):+.4f}"],
                 ['B Relative (Salt Perm. Degradation)',
                  '1.000',
-                 f"{sel.get('b_relative', 1.0):.4f}",
-                 f"{sel.get('b_relative', 1.0) - 1.0:+.4f}"],
+                 f"{sel.get('b_irr', 1.0):.4f}",
+                 f"{sel.get('b_irr', 1.0) - 1.0:+.4f}"],
             ],
             col_widths=[5.5, 3.2, 3.2, 2.6]
         )
