@@ -1,0 +1,304 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<title>Scaling &amp; Fouling Analysis — Project PACE</title>
+<style>
+  :root{
+    --navy:#1E2A5E;
+    --navy-deep:#16204A;
+    --indigo:#4F46E5;
+    --sky:#38BDF8;
+    --page-bg:#F3F5FB;
+    --card-bg:#FFFFFF;
+    --border:#E4E8F2;
+    --text-navy:#1E293B;
+    --text-muted:#6B7280;
+    --green:#16A34A;
+    --green-bg:#EAFBF1;
+    --amber:#D97706;
+    --amber-bg:#FFF8EB;
+    --red:#DC2626;
+    --red-bg:#FEF1F1;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--page-bg);
+    font-family:'Segoe UI', Inter, -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+    color:var(--text-navy);
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ---------- Gradient border + glow utility ---------- */
+  .glow-card{
+    position:relative;
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    border:1px solid var(--border);
+    box-shadow:0 1px 3px rgba(16,24,64,0.06);
+    transition:box-shadow .25s ease, border-color .25s ease, transform .25s ease;
+  }
+  .glow-card::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:var(--radius);
+    padding:1.5px;
+    background:linear-gradient(135deg, rgba(79,70,229,.55), rgba(56,189,248,.55));
+    -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor;
+    mask-composite:exclude;
+    opacity:.55;
+    pointer-events:none;
+    transition:opacity .25s ease;
+  }
+  .glow-card:hover{
+    border-color:#3B82F6;
+    transform:translateY(-2px);
+    box-shadow:
+      0 0 0 1px #60A5FA,
+      0 0 22px 5px rgba(59,130,246,.35),
+      0 0 44px 10px rgba(96,165,250,.18);
+  }
+  .glow-card:hover::before{ opacity:1; }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    background:#fff;border-bottom:1px solid var(--border);
+    padding:10px 28px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;color:var(--navy-deep);}
+  .brand .logo-dot{
+    width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(135deg,var(--indigo),var(--sky));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:800;
+  }
+  .topbar-search{
+    flex:1;max-width:420px;margin:0 24px;
+    background:#F3F5FB;border:1px solid var(--border);border-radius:9px;
+    padding:8px 14px;color:var(--text-muted);font-size:13px;
+  }
+  .topbar-right{display:flex;align-items:center;gap:14px;}
+  .icon-btn{
+    width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;color:var(--text-muted);
+    background:#fff;font-size:15px;cursor:pointer;
+  }
+  .run-btn{
+    background:linear-gradient(135deg,var(--indigo),#6366F1);
+    color:#fff;border:none;border-radius:9px;padding:9px 18px;font-weight:600;
+    font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;
+    box-shadow:0 2px 8px rgba(79,70,229,.35);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .run-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(79,70,229,.45);}
+
+  /* ---------- Tabs ---------- */
+  .tabbar{
+    display:flex;align-items:center;gap:26px;
+    background:#fff;border-bottom:1px solid var(--border);
+    padding:0 28px;font-size:13.5px;color:var(--text-muted);
+  }
+  .tabbar .tab{
+    padding:13px 2px;cursor:pointer;display:flex;align-items:center;gap:7px;
+    border-bottom:2.5px solid transparent;font-weight:500;
+  }
+  .tabbar .tab.active{color:var(--indigo);font-weight:700;border-bottom-color:var(--indigo);}
+  .tabbar .tab:hover:not(.active){color:var(--text-navy);}
+
+  /* ---------- Page wrapper ---------- */
+  .page{max-width:1760px;margin:0 auto;padding:26px 28px 48px;}
+  .page-header{display:flex;align-items:flex-start;gap:14px;margin-bottom:24px;}
+  .page-header .tri{
+    width:38px;height:38px;border-radius:10px;background:var(--amber-bg);
+    display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:18px;flex:none;margin-top:2px;
+  }
+  .page-header h1{margin:0;font-size:26px;font-weight:800;color:var(--navy-deep);letter-spacing:-.3px;}
+  .page-header p{margin:4px 0 0;color:var(--text-muted);font-size:14px;}
+
+  /* ---------- Section header bar (navy) ---------- */
+  .section-head{
+    display:flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,var(--navy) 0%, #28387A 100%);
+    color:#fff;border-radius:var(--radius) var(--radius) 0 0;
+    padding:13px 18px;font-weight:700;font-size:13px;letter-spacing:.04em;
+  }
+  .section-head .lhs{display:flex;align-items:center;gap:9px;}
+
+  /* ---------- Main grid ---------- */
+  .main-grid{
+    display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start;
+  }
+  .panel{ overflow:hidden; }
+  .panel-body{padding:18px 20px 20px;}
+  .panel-subtitle{font-size:15px;font-weight:700;color:var(--text-navy);margin:0 0 14px;}
+
+  /* ---------- Compound card grid ---------- */
+  .compound-grid{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+  }
+  .compound-card{
+    background:#FFFFFF;border:1px solid var(--border);border-radius:10px;
+    padding:14px 16px;position:relative;overflow:hidden;
+    transition:box-shadow .2s ease, border-color .2s ease, transform .2s ease;
+  }
+  .compound-card:hover{
+    transform:translateY(-2px);
+    border-color:#93C5FD;
+    box-shadow:0 0 0 1px #93C5FD, 0 0 18px 3px rgba(59,130,246,.22);
+  }
+  .compound-card.flag{border-left:3px solid var(--indigo);}
+  .compound-name{font-size:12.5px;font-weight:600;color:var(--text-muted);margin:0 0 8px;}
+  .compound-value{font-size:19px;font-weight:800;display:flex;align-items:center;gap:6px;}
+  .compound-value .pct{font-size:13px;font-weight:700;}
+  .compound-value.green{color:var(--green);}
+  .compound-value.amber{color:var(--amber);}
+  .compound-value.red{color:var(--red);}
+  .warn-icon{font-size:13px;}
+
+  /* ---------- Chart panel ---------- */
+  .chart-wrap{padding:6px 8px 4px;}
+  .legend{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin:6px 4px 10px;}
+  .legend .swatch{width:11px;height:11px;border-radius:3px;background:var(--indigo);display:inline-block;}
+  .axis-label{font-size:10.5px;fill:#94A3B8;}
+  .bar-label{font-size:9.5px;fill:#64748B;}
+
+  .run-scaling-btn{
+    width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+    background:linear-gradient(135deg,var(--indigo),#6366F1);
+    color:#fff;border:none;padding:13px 0;border-radius:10px;font-weight:700;font-size:14px;
+    cursor:pointer;margin-top:16px;
+    box-shadow:0 4px 14px rgba(79,70,229,.3);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .run-scaling-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,70,229,.4);}
+
+  /* ---------- Footer status ---------- */
+  .footer-status{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-top:22px;padding:12px 20px;background:#fff;border:1px solid var(--border);
+    border-radius:10px;font-size:12.5px;color:var(--text-muted);
+  }
+  .footer-status .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;}
+  .footer-status .right-actions{display:flex;gap:10px;}
+  .footer-status button{
+    border:1px solid var(--border);background:#fff;border-radius:7px;padding:7px 14px;font-size:12.5px;
+    color:var(--text-navy);cursor:pointer;font-weight:600;
+  }
+  .footer-status button.danger{color:var(--red);border-color:#FCD5D5;}
+  .footer-status button.primary{background:var(--indigo);color:#fff;border:none;}
+</style>
+</head>
+<body style="background-color: rgba(190, 210, 255, 0.76); color: #191b24; font-family: 'Inter', sans-serif;">
+<!-- Top bar -->
+<nav class="flex flex-col shadow-sm bg-white shrink-0"><div class="w-full border-b border-outline-variant/30 h-12 px-margin-desktop flex items-center justify-between"><div class="flex items-center gap-sm"><img alt="PERMIONICS" class="h-6 w-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq7jhVj6qDur0WmeZP7Df9oPKINpR4steZ0AYGo_I-CehN1ghnC5mugyTJc5iOGAoYXkKn1odNO-EcMVGKyS4kefweIdfJxrSqNHyJ88-haygcyIXkq5GCLNb6-oM9wAhF1ldUQohUoVOA9n0RcXd_W9d-bFRqyfZyFKzvMYmyXu2VLWhqvg3QUm9EXHiYCjhYv0D15_yHlGFo8SomcFVMFovLI0J3A2wVt1ubxq2M7w9xnczsb7n7UsigtyY_ckE3Q2wOykeWGOezgw"><span class="font-black text-[16px] text-[#191b24] ml-xs">Projection Software</span></div><div class="flex items-center gap-md"><div class="relative"><input class="bg-surface-container-low border-outline-variant rounded px-sm py-1 pl-8 text-on-surface placeholder-outline text-[12px] w-48 focus:ring-2 focus:ring-primary-accent/20 outline-none" placeholder="Search..." type="text"><span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-outline text-[16px]">search</span></div><button class="btn-primary py-1 px-3">Run Analysis</button><div class="flex items-center gap-xs"><span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1">notifications</span><span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1">settings</span></div></div></div></nav>
+<!-- Tabs -->
+<div class="w-full bg-[#4884EB]/40 backdrop-blur-sm h-10 px-margin-desktop flex items-center gap-lg"><div class="flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70 cursor-pointer"><span class="material-symbols-outlined text-[16px]">folder</span><span class="text-[11px] font-bold uppercase tracking-tight">File</span><span class="material-symbols-outlined text-[14px]">expand_more</span></div><a class="nav-link flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70" href="#"><span class="material-symbols-outlined text-[16px]">database</span><span class="text-[11px] font-bold uppercase tracking-tight">Feed Data</span></a><a class="nav-link active flex items-center gap-xs px-3 h-8 rounded text-[#000000]" href="#"><span class="material-symbols-outlined text-[16px] text-orange-500">warning</span><span class="text-[11px] font-bold uppercase tracking-tight">Scaling &amp; Fouling Analysis</span></a><a class="nav-link flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70" href="#"><span class="material-symbols-outlined text-[16px] text-purple-500">recommend</span><span class="text-[11px] font-bold uppercase tracking-tight">Process Recommendation</span></a><a class="nav-link flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70" href="#"><span class="material-symbols-outlined text-[16px] text-blue-500">calculate</span><span class="text-[11px] font-bold uppercase tracking-tight">Calculation</span></a><a class="nav-link flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70" href="#"><span class="material-symbols-outlined text-[16px] text-primary-accent">hourglass_empty</span><span class="text-[11px] font-bold uppercase tracking-tight">Membrane Aging</span></a><a class="nav-link flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70" href="#"><span class="material-symbols-outlined text-[16px] text-red-500">assessment</span><span class="text-[11px] font-bold uppercase tracking-tight">Report</span></a></div>
+<div class="page">
+<!-- Page header -->
+<div class="page-header"><div class="flex flex-col"><h1 class="font-black text-primary-accent text-[28px] leading-tight tracking-tight">Scaling &amp; Fouling Analysis</h1><p class="text-[12px] text-on-surface-variant -mt-1">Review saturation indices and fouling risk across key scaling compounds.</p></div></div>
+<!-- Main two-column grid -->
+<div class="main-grid">
+<!-- LEFT: Saturation indices -->
+<div class="glow-card panel interactive-card-hover">
+<div class="card-header-gradient flex items-center gap-xs"><span class="material-symbols-outlined text-on-primary text-[18px]">warning</span><h3 class="text-[13px] font-bold text-on-primary uppercase tracking-tight">Saturation Indices (SI)</h3></div>
+<div class="panel-body">
+<p class="panel-subtitle">Saturation Indices (SI)</p>
+<div class="compound-grid" id="compoundGrid"></div>
+</div>
+</div>
+<!-- RIGHT: Chart -->
+<div class="glow-card panel interactive-card-hover">
+<div class="card-header-gradient flex items-center gap-xs"><span class="material-symbols-outlined text-on-primary text-[18px]">bar_chart</span><h3 class="text-[13px] font-bold text-on-primary uppercase tracking-tight">Saturation Visualization</h3></div>
+<div class="panel-body chart-wrap">
+<div class="legend"><span class="swatch"></span> Saturation Index (log10)</div>
+<svg height="280" id="satChart" viewBox="0 0 480 300" width="100%"></svg>
+<button class="run-scaling-btn">⚡ Run Scaling Analysis</button>
+</div>
+</div>
+</div>
+<!-- Footer status -->
+<footer class="h-12 bg-white border-t border-outline-variant px-margin-desktop flex items-center justify-between shrink-0 z-10 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] rounded-xl mt-6"><div class="flex items-center gap-md"><div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-success animate-pulse"></div><span class="text-[11px] font-black uppercase tracking-widest text-on-surface">Project Status: Ready</span></div><span class="h-4 w-px bg-outline-variant/30 mx-2"></span><div class="flex items-center gap-1.5 text-on-surface-variant/60 text-[10px] font-bold"><span class="material-symbols-outlined text-[16px]">history</span>Last Saved: 24 Jun 2026, 11:42 AM</div></div><div class="flex gap-md"><button class="px-4 py-1.5 text-[11px] font-black text-error border border-error/30 hover:bg-error/5 rounded uppercase transition-colors">Reset All</button><button class="px-4 py-1.5 text-[11px] font-black text-on-surface-variant hover:text-primary-accent border border-outline-variant/50 hover:border-primary-accent rounded uppercase transition-colors">Load Project</button><button class="btn-primary py-1.5 px-6 flex items-center gap-2 uppercase tracking-widest font-black shadow-md"><span class="material-symbols-outlined text-[16px]">save</span>Save Project</button></div></footer>
+</div>
+<script>
+  const compounds = [
+    {name:"Gypsum (CaSO₄·2H₂O)", val:-1.583, pct:3,  level:"green"},
+    {name:"Anhydrite (CaSO₄)",   val:-1.886, pct:1,  level:"green"},
+    {name:"Calcite (CaCO₃)",     val:-0.077, pct:84, level:"amber"},
+    {name:"Barite (BaSO₄)",      val:-0.131, pct:74, level:"amber"},
+    {name:"Celestite (SrSO₄)",   val:-1.699, pct:2,  level:"green"},
+    {name:"Fluorite (CaF₂)",     val:-1.468, pct:3,  level:"green", flag:true},
+    {name:"Silica (SiO₂)",       val:-0.811, pct:15, level:"green"},
+    {name:"Iron (Fe(OH)₃)",      val:1.067,  pct:1168, level:"red", warn:true},
+    {name:"Aluminium (Al(OH)₃)", val:-1.361, pct:4,  level:"green"},
+    {name:"Pyrolusite (MnO₂)",   val:-11.363,pct:0,  level:"green"},
+    {name:"Hydroxyapatite",      val:-2.115, pct:1,  level:"green"},
+  ];
+
+  const grid = document.getElementById('compoundGrid');
+  compounds.forEach(c=>{
+    const card = document.createElement('div');
+    card.className = 'compound-card' + (c.flag ? ' flag' : '');
+    card.innerHTML = `
+      <p class="compound-name">${c.name}</p>
+      <div class="compound-value ${c.level}">
+        ${c.val.toFixed(3)} <span class="pct">(${c.pct}%)</span>
+        ${c.warn ? '<span class="warn-icon">⚠️</span>' : ''}
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  // ---- SVG bar chart ----
+  const chartData = [
+    {label:"Gypsum",    val:-1.58},
+    {label:"Anhydrite", val:-1.89},
+    {label:"Calcite",   val:-0.08, marker:true},
+    {label:"Barite",    val:-0.13},
+    {label:"Celestite", val:-1.70},
+    {label:"Fluorite",  val:-1.47},
+    {label:"Silica",    val:-0.81},
+    {label:"Fe(OH)₃",   val:1.07},
+    {label:"Al(OH)₃",   val:-1.36},
+    {label:"Pyrolusite",val:-11.36},
+    {label:"Hydroxyapatite", val:-2.12},
+  ];
+
+  const svg = document.getElementById('satChart');
+  const W=480, H=300, padL=36, padR=12, padT=20, padB=60;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const minV=-12, maxV=2;
+  const yScale = v => padT + (maxV - v) / (maxV - minV) * plotH;
+  const zeroY = yScale(0);
+  const barW = plotW / chartData.length * 0.55;
+  const gap = plotW / chartData.length;
+
+  let svgContent = '';
+  // Gridlines + axis labels
+  [2, 0, -2, -4, -6, -8, -10, -12].forEach(t=>{
+    const y = yScale(t);
+    svgContent += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#EEF1F8" stroke-width="1"/>`;
+    svgContent += `<text x="${padL-8}" y="${y+3}" text-anchor="end" class="axis-label">${t}</text>`;
+  });
+  svgContent += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#CBD5E1" stroke-width="1"/>`;
+
+  chartData.forEach((d,i)=>{
+    const x = padL + i*gap + (gap-barW)/2;
+    const y = Math.min(yScale(d.val), zeroY);
+    const h = Math.abs(yScale(d.val) - zeroY);
+    const color = '#4F46E5'; // indigo
+    
+    // Bar
+    svgContent += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h,2)}" rx="2" fill="${color}" opacity="0.85"/>`;
+    
+    // Red marker for Calcite
+    if(d.marker){
+       svgContent += `<circle cx="${x+barW/2}" cy="${yScale(d.val)}" r="5" fill="#DC2626"/>`;
+    }
+
+    // Rotated labels
+    svgContent += `<text x="${x+barW/2}" y="${H-padB+14}" text-anchor="end" transform="rotate(-35 ${x+barW/2} ${H-padB+14})" class="bar-label">${d.label}</text>`;
+  });
+
+  svg.innerHTML = svgContent;
+</script>
+</body></html>

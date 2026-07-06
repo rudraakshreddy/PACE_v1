@@ -2,33 +2,33 @@ import fitz
 
 def create_watermark_image():
     temp_doc = fitz.open()
-    fontsize = 60
+    fontsize = 80
     text = "PERMIONICS"
     
     # Calculate exact text width
     text_w = fitz.get_text_length(text, fontname="helv", fontsize=fontsize)
     
-    # Define padding on both sides to prevent cutting off any letters
-    padding = 20
+    padding = 30
     w = int(text_w + 2 * padding)
-    h = 100
+    h = int(fontsize * 1.5)
     
     page = temp_doc.new_page(width=w, height=h)
     
     # Draw text with opacity, starting exactly at the padding x-coordinate
     page.insert_text(
-        fitz.Point(padding, 70), 
+        fitz.Point(padding, h * 0.70), 
         text, 
         fontname="helv", 
         fontsize=fontsize, 
-        color=(0.8, 0.8, 0.8), 
-        fill_opacity=0.3
+        color=(0.6, 0.6, 0.6), 
+        fill_opacity=0.15
     )
     
-    # Rasterize with alpha
-    pix = page.get_pixmap(alpha=True)
+    # Rasterize with alpha and rotate by 45 degrees
+    matrix = fitz.Matrix(45)
+    pix = page.get_pixmap(alpha=True, matrix=matrix)
     temp_doc.close()
-    return pix, w, h
+    return pix, pix.width, pix.height
 
 doc = fitz.open()
 target_page = doc.new_page()

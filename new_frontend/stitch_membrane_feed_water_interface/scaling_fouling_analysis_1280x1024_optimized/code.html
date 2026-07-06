@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<title>Scaling &amp; Fouling Analysis — Project PACE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#0051d3",
+                        "primary-accent": "#3D53D7",
+                        "on-primary": "#ffffff",
+                        "background": "#F3F5FB",
+                        "surface": "#ffffff",
+                        "outline": "#737686",
+                        "outline-variant": "#c3c6d7",
+                        "on-surface": "#191b24",
+                        "on-surface-variant": "#424655",
+                        "surface-container": "#ededf9",
+                        "surface-container-low": "#f3f2ff",
+                        "tertiary": "#a13f00",
+                        "error": "#DC2626",
+                        "success": "#10b981",
+                        "navy-deep": "#16204A",
+                        "tab-inactive": "#6B7280",
+                        "tab-active": "#4F46E5"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "sm": "8px",
+                        "margin-desktop": "16px",
+                        "gutter": "16px",
+                        "xl": "32px",
+                        "md": "16px",
+                        "margin-mobile": "16px",
+                        "lg": "24px"
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #F3F5FB;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .glow-card {
+            position: relative;
+            background: #FFFFFF;
+            border-radius: 12px;
+            border: 1px solid #E4E8F2;
+            box-shadow: 0 1px 3px rgba(16, 24, 64, 0.06);
+            transition: box-shadow .25s ease, border-color .25s ease, transform .25s ease;
+            overflow: hidden;
+        }
+
+        .glow-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            padding: 1.5px;
+            background: linear-gradient(135deg, #4F46E5, #38BDF8);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 1;
+            pointer-events: none;
+        }
+
+        .glow-card:hover {
+            border-color: #3B82F6;
+            transform: translateY(-2px);
+            box-shadow: 0 0 0 1px #60A5FA, 0 0 24px 6px rgba(59, 130, 246, 0.45), 0 0 48px 12px rgba(96, 165, 250, 0.25);
+            z-index: 20;
+        }
+
+        .card-header-gradient {
+            background: linear-gradient(135deg, #3D53D7 0%, #28378d 100%);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .compound-card {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 16px;
+            position: relative;
+            transition: all 0.25s ease;
+            border: 1px solid #E4E8F2;
+        }
+
+        .compound-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 8px;
+            padding: 1.5px;
+            background: linear-gradient(135deg, #4F46E5, #38BDF8);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 1;
+            pointer-events: none;
+        }
+
+        .compound-card:hover {
+            border-color: #3B82F6;
+            transform: translateY(-2px);
+            box-shadow: 0 0 0 1px #60A5FA, 0 0 24px 6px rgba(59, 130, 246, 0.45), 0 0 48px 12px rgba(96, 165, 250, 0.25);
+            z-index: 10;
+        }
+
+        .axis-label { font-size: 10px; fill: #6B7280; font-weight: 500; }
+        .bar-label { font-size: 9px; fill: #4B5563; font-weight: 600; }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3D53D7, #28378d);
+            color: white;
+            font-weight: 700;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            filter: brightness(1.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col" style="background-color: rgb(206, 221, 255);">
+<!-- Top Navigation -->
+<nav class="flex flex-col shadow-sm bg-white shrink-0 z-20">
+<div class="w-full border-b border-outline-variant/30 h-12 px-margin-desktop flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<img alt="PERMIONICS" class="h-6 w-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq7jhVj6qDur0WmeZP7Df9oPKINpR4steZ0AYGo_I-CehN1ghnC5mugyTJc5iOGAoYXkKn1odNO-EcMVGKyS4kefweIdfJxrSqNHyJ88-haygcyIXkq5GCLNb6-oM9wAhF1ldUQohUoVOA9n0RcXd_W9d-bFRqyfZyFKzvMYmyXu2VLWhqvg3QUm9EXHiYCjhYv0D15_yHlGFo8SomcFVMFovLI0J3A2wVt1ubxq2M7w9xnczsb7n7UsigtyY_ckE3Q2wOykeWGOezgw"/>
+<span class="font-black text-[16px] text-[#191b24] ml-xs">Projection Software</span>
+</div>
+<div class="flex items-center gap-md">
+<div class="relative">
+<input class="bg-surface-container-low border border-outline-variant rounded px-sm py-1 pl-8 text-on-surface placeholder-outline text-[12px] w-48 focus:ring-2 focus:ring-primary-accent/20 outline-none" placeholder="Search..." type="text"/>
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-outline text-[16px]">search</span>
+</div>
+<button class="btn-primary py-1 px-4 text-[13px]">Run Analysis</button>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1">settings</span>
+<div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center ml-1 cursor-pointer border border-primary/20">
+<span class="text-primary font-bold text-[10px]">JD</span>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<!-- Restoration Tab Bar -->
+<div class="w-full bg-[#F3F5FB] h-10 px-margin-desktop flex items-center gap-lg z-10 border-b border-[#E4E8F2]" style="background-color: rgb(161, 182, 218);">
+<div class="flex items-center gap-xs px-3 h-full text-tab-inactive cursor-pointer hover:text-black transition-colors">
+<span class="material-symbols-outlined text-[16px]">folder</span>
+<span class="text-[11px] font-bold uppercase tracking-tight">File</span>
+<span class="material-symbols-outlined text-[14px]">expand_more</span>
+</div>
+<a class="flex items-center gap-xs px-3 h-full text-tab-inactive hover:text-black transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">database</span>
+<span class="text-[11px] font-bold uppercase tracking-tight">Feed Data</span>
+</a>
+<a class="flex items-center gap-xs px-3 h-full text-tab-active border-b-[2.5px] border-tab-active" href="#">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+<span class="text-[11px] font-bold uppercase tracking-tight">Scaling &amp; Fouling Analysis</span>
+</a>
+<a class="flex items-center gap-xs px-3 h-full text-tab-inactive hover:text-black transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">recommend</span>
+<span class="text-[11px] font-bold uppercase tracking-tight">Process Recommendation</span>
+</a>
+<a class="flex items-center gap-xs px-3 h-full text-tab-inactive hover:text-black transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">calculate</span>
+<span class="text-[11px] font-bold uppercase tracking-tight">Calculation</span>
+</a>
+<a class="flex items-center gap-xs px-3 h-full text-tab-inactive hover:text-black transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">hourglass_empty</span>
+<span class="text-[11px] font-bold uppercase tracking-tight">Membrane Aging</span>
+</a>
+<a class="flex items-center gap-xs px-3 h-full text-tab-inactive hover:text-black transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">assessment</span>
+<span class="text-[11px] font-bold uppercase tracking-tight">Report</span>
+</a>
+</div>
+<!-- Page Content -->
+<main class="flex-1 max-w-[1200px] mx-auto w-full px-margin-desktop py-6 flex flex-col gap-4"></main>
+<script>
+        const compounds = [
+            {name:"Gypsum (CaSO₄·2H₂O)", val:-1.583, pct:3,  level:"#16A34A"},
+            {name:"Anhydrite (CaSO₄)",   val:-1.886, pct:1,  level:"#16A34A"},
+            {name:"Calcite (CaCO₃)",     val:-0.077, pct:84, level:"#D97706"},
+            {name:"Barite (BaSO₄)",      val:-0.131, pct:74, level:"#D97706"},
+            {name:"Celestite (SrSO₄)",   val:-1.699, pct:2,  level:"#16A34A"},
+            {name:"Fluorite (CaF₂)",     val:-1.468, pct:3,  level:"#16A34A"},
+            {name:"Silica (SiO₂)",       val:-0.811, pct:15, level:"#16A34A"},
+            {name:"Iron (Fe(OH)₃)",      val:1.067,  pct:1168, level:"#DC2626", warn:true},
+            {name:"Aluminium (Al(OH)₃)", val:-1.361, pct:4,  level:"#16A34A"},
+            {name:"Pyrolusite (MnO₂)",   val:-11.363,pct:0,  level:"#16A34A"},
+            {name:"Hydroxyapatite",      val:-2.115, pct:1,  level:"#16A34A"},
+        ];
+
+        const grid = document.getElementById('compoundGrid');
+        compounds.forEach(c => {
+            const card = document.createElement('div');
+            card.className = 'compound-card';
+            card.innerHTML = `
+                <p class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight mb-2 opacity-70 truncate" title="${c.name}">${c.name}</p>
+                <div class="flex items-end justify-between">
+                    <div class="text-[20px] font-black tracking-tight" style="color: ${c.level}">
+                        ${c.val.toFixed(3)}
+                        ${c.warn ? '<span class="ml-1 text-[16px]">⚠️</span>' : ''}
+                    </div>
+                    <div class="text-[11px] font-bold text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded">
+                        ${c.pct}%
+                    </div>
+                </div>`;
+            grid.appendChild(card);
+        });
+
+        // ---- SVG bar chart ----
+        const chartData = [
+            {label:"Gypsum",    val:-1.58},
+            {label:"Anhydrite", val:-1.89},
+            {label:"Calcite",   val:-0.08, marker:true},
+            {label:"Barite",    val:-0.13},
+            {label:"Celestite", val:-1.70},
+            {label:"Fluorite",  val:-1.47},
+            {label:"Silica",    val:-0.81},
+            {label:"Fe(OH)₃",   val:1.07},
+            {label:"Al(OH)₃",   val:-1.36},
+            {label:"Pyrolusite",val:-11.36},
+            {label:"H-apatite", val:-2.12},
+        ];
+
+        const svg = document.getElementById('satChart');
+        const W=500, H=300, padL=40, padR=20, padT=30, padB=80; // Increased padB for label rotation
+        const plotW = W-padL-padR, plotH = H-padT-padB;
+        const minV=-12, maxV=2;
+        const yScale = v => padT + (maxV - v) / (maxV - minV) * plotH;
+        const zeroY = yScale(0);
+        const gap = plotW / chartData.length;
+        const barW = gap * 0.65;
+
+        let svgContent = '';
+        // Gridlines
+        [2, 0, -2, -4, -6, -8, -10, -12].forEach(t => {
+            const y = yScale(t);
+            svgContent += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="${t === 0 ? '#CBD5E1' : '#E5E7EB'}" stroke-width="${t === 0 ? 1.5 : 1}"/>`;
+            svgContent += `<text x="${padL-10}" y="${y+4}" text-anchor="end" class="axis-label">${t}</text>`;
+        });
+
+        chartData.forEach((d, i) => {
+            const x = padL + i*gap + (gap-barW)/2;
+            const y = Math.min(yScale(d.val), zeroY);
+            const h = Math.abs(yScale(d.val) - zeroY);
+            const color = d.val > 0 ? '#DC2626' : '#3D53D7';
+            
+            // Bar
+            svgContent += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h, 2)}" rx="2" fill="${color}" fill-opacity="0.9"/>`;
+            
+            // Marker
+            if(d.marker) {
+                svgContent += `<circle cx="${x+barW/2}" cy="${yScale(d.val)}" r="5" fill="#DC2626" stroke="#fff" stroke-width="1.5"/>`;
+            }
+
+            // Labels rotated to -30 degrees
+            svgContent += `
+                <g transform="translate(${x+barW/2}, ${H-padB+15})">
+                    <text text-anchor="end" transform="rotate(-30)" class="bar-label">${d.label}</text>
+                </g>`;
+        });
+
+        svg.innerHTML = svgContent;
+    </script>
+</body></html>

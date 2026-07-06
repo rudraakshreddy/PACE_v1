@@ -499,23 +499,26 @@ def generate_calc_report(data: SystemCalcInput):
             
             # Step 1: Create an image of the watermark
             temp_doc = fitz.open()
-            fontsize = 60
+            fontsize = 80
             text = "PERMIONICS"
             text_w = fitz.get_text_length(text, fontname="helv", fontsize=fontsize)
-            padding = 20
+            padding = 30
             w = int(text_w + 2 * padding)
-            h = 100
+            h = int(fontsize * 1.5)
             
             w_page = temp_doc.new_page(width=w, height=h)
             w_page.insert_text(
-                fitz.Point(padding, 70), 
+                fitz.Point(padding, h * 0.70), 
                 text, 
                 fontname="helv",
                 fontsize=fontsize, 
-                color=(0.8, 0.8, 0.8), 
-                fill_opacity=0.3
+                color=(0.6, 0.6, 0.6), 
+                fill_opacity=0.15
             )
-            pix = w_page.get_pixmap(alpha=True)
+            matrix = fitz.Matrix(45)
+            pix = w_page.get_pixmap(alpha=True, matrix=matrix)
+            w = pix.width
+            h = pix.height
             temp_doc.close()
 
             # Step 2: Overlay image onto actual PDF
@@ -757,9 +760,11 @@ def _run_projection_core(
     else:
         baseline = engine.calculate_system(input_dict)
 
-    # For 2P-RO, baseline["ro_results"] was constructed above with the true combined
-    # system summary (correct TDS, SEC, recovery, flow). Prefer it over raw pass1_results.
-    # For 1P-RO, baseline itself contains the summary and recycle data.
+    # For physics simulation, we MUST use the pure Pass 1 parameters (flow, recovery, TDS)
+    # so that the simulated fouled permeate TDS matches the physics equations.
+    physics_baseline_ro = baseline.get("pass1_results") or baseline.get("ro_results") or baseline
+
+    # For the UI presentation baseline, we use the merged system properties.
     baseline_ro = baseline.get("ro_results") or baseline.get("pass1_results") or baseline
 
     # ── Recycle: blended feed ion concentrations for physics engine ──────
@@ -890,7 +895,7 @@ def _run_projection_core(
         print("Error calculating bulk concentrate SI in server.py:", e)
 
     physics_results = phys_engine.run_physics_projection(
-        baseline_ro_result  = baseline_ro,
+        baseline_ro_result  = physics_baseline_ro,
         feed_ions           = ions,
         temp_c              = temp_c,
         ph                  = ph,
@@ -916,7 +921,7 @@ def _run_projection_core(
     if "annual_snapshots" in physics_results:
         # Extract baseline metrics, supporting both 1-Pass (summary) and 2-Pass (system_summary)
         base_summ = baseline_ro.get("summary", {})
-        sys_summ  = baseline_ro.get("system_summary", {})
+        sys_summ  = baseline.get("system_summary", {})
         # Recycle data is stored at the root of the baseline object
         recycle_data = baseline.get("recycle", {})
 
@@ -929,8 +934,8 @@ def _run_projection_core(
             
         true_base_pressure = base_summ.get("feed_pressure_bar", None)  # P1 pressure
         true_base_tds      = base_summ.get("perm_tds", None)
-        if "pass2" in baseline_ro:  # For 2-Pass RO, TDS comes from Pass 2
-            true_base_tds = baseline_ro["pass2"]["summary"].get("perm_tds", true_base_tds)
+        if "pass2_results" in baseline:  # For 2-Pass RO, TDS comes from Pass 2
+            true_base_tds = baseline["pass2_results"]["summary"].get("perm_tds", true_base_tds)
 
         true_base_sec = sys_summ.get("sec_kwh_m3") if sys_summ else base_summ.get("sec_kwh_m3", None)
 
@@ -948,6 +953,7 @@ def _run_projection_core(
 
         # ── Correct Year 0 snapshot to the true combined baseline ──────────
         if len(snaps) > 0:
+            raw_year0_sec = snaps[0].get("sec_kwh_m3", 0.0)
             snaps[0]["recovery"] = true_recovery
             snaps[0]["npf"]      = 1.0   # ASTM baseline — always 1.0
             snaps[0]["nsp"]      = 1.0   # ASTM baseline — always 1.0
@@ -966,6 +972,17 @@ def _run_projection_core(
                 snap["recovery"] = true_recovery
                 if true_perm is not None:
                     snap["perm_flow"] = true_perm
+                
+                # Apply 2-Pass normalization for TDS and SEC
+                if true_base_tds is not None:
+                    # In a 2-Pass system, if Pass 1 NSP increases (e.g. 1.10), 
+                    # Pass 2 feed TDS increases by 10%, causing its permeate TDS to rise proportionately.
+                    snap["perm_tds"] = true_base_tds * snap["nsp"]
+                
+                if true_base_sec is not None:
+                    # SEC penalty is driven by physical fouling delta 
+                    delta_sec = snap["sec_kwh_m3"] - raw_year0_sec
+                    snap["sec_kwh_m3"] = true_base_sec + delta_sec
                 
                 # NPF and NSP: the physics engine now uses the correct ASTM D4516-19a
                 # constant-flow formula (NDP_0 / NDP_y). Values are already physically

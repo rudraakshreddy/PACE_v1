@@ -3976,6 +3976,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const payload = {
                     technology_train: safeStr('calc-tech-train', 'RO'),
+                    project_details: {
+                        name: safeStr('proj-name', 'PACE Report'),
+                        author: safeStr('proj-engineer', ''),
+                        company: safeStr('proj-company', ''),
+                        date: safeStr('proj-date', '')
+                    },
                     feed_water: feedData,
                     target_flow_m3h: safeVal('flow', 100),
                     target_recovery_pct: safeVal('calc-target-recovery', 75),
@@ -4217,6 +4223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         setT('#calc-2p-p2-press-summary', p2sum.feed_pressure_bar.toFixed(1));
                         setT('#calc-2p-p2-tds-summary',  p2sum.perm_tds.toFixed(2));
                         setT('#calc-2p-p2-sec',          p2sum.sec_kwh_m3.toFixed(2));
+                        setT('#calc-2p-p2-pump',         (p2sum.hp_pump_power_kw || 0).toFixed(1));
 
                         // Interstage Conditioning Element
                         const elCondDesc = results.querySelector('#calc-2p-cond-desc');
@@ -4390,8 +4397,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Draw PFD
                 try {
-                    const p1ArrText = document.getElementById('calc-vessels-array').value || '4,2';
-                    const p1Arr = p1ArrText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+                    const p1ArrText = document.getElementById('calc-vessels-array').value;
+                    const p1Arr = p1ArrText ? p1ArrText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0) : [];
                     const nEl = parseInt(document.getElementById('calc-elements-pv').value) || 6;
                     window.drawPFDSVG(data.ro_results, p1Arr, nEl);
                 } catch(e) {
@@ -4430,13 +4437,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 runBtn.disabled = false;
 
-                // Show report button
-                const reportBtn = document.getElementById('calc-report-btn');
-                if (reportBtn) {
-                    reportBtn.style.display = 'block';
-                    // Store last payload to generate report
-                    window.lastCalcPayload = payload;
+                // Store last payload to generate report
+                window.lastCalcPayload = payload;
+                window.lastCalcPayload.ro_results = data.ro_results; // save results too for completeness
+                if (data.physics_results) {
+                    window.lastCalcPayload.physics_results = data.physics_results;
+                    window.lastCalcPayload.physics_selected_year = data.physics_selected_year || 0;
                 }
+
+                // Show report button (if it was hidden somewhere)
+                const oldReportBtn = document.getElementById('calc-report-btn');
+                if (oldReportBtn) oldReportBtn.style.display = 'block';
 
 
             } catch (err) {
@@ -4450,16 +4461,72 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const reportBtn = document.getElementById('calc-report-btn');
-    if (reportBtn) {
-        reportBtn.addEventListener('click', async () => {
+    const genReportBtn = document.getElementById('wave-report-generate-btn');
+    const dlReportBtn = document.getElementById('wave-report-download-btn');
+    
+    if (dlReportBtn) {
+        dlReportBtn.addEventListener('click', () => {
+            if (!window.currentReportPdfUrl) return;
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = window.currentReportPdfUrl;
+            a.download = 'PACE_Calculation_Report.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    }
+
+    if (genReportBtn) {
+        genReportBtn.addEventListener('click', async () => {
             if (!window.lastCalcPayload) return;
             
-            const btnOriginalText = reportBtn.innerHTML;
-            reportBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Generating...';
-            reportBtn.disabled = true;
+            const btnOriginalText = genReportBtn.innerHTML;
+            genReportBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Generating...';
+            genReportBtn.disabled = true;
 
             try {
+                const pfdContainer = document.getElementById('pfd-svg-container');
+                const svgEl = pfdContainer ? pfdContainer.querySelector('svg') : null;
+                if (svgEl) {
+                    try {
+                        const serializer = new XMLSerializer();
+                        let svgStr = serializer.serializeToString(svgEl);
+                        if (!svgStr.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+                            svgStr = svgStr.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+                        }
+                        const svgBlob = new Blob([svgStr], {type: 'image/svg+xml;charset=utf-8'});
+                        const url = window.URL.createObjectURL(svgBlob);
+                        
+                        const canvas = document.createElement('canvas');
+                        const w = svgEl.viewBox.baseVal ? svgEl.viewBox.baseVal.width : 800;
+                        const h = svgEl.viewBox.baseVal ? svgEl.viewBox.baseVal.height : 400;
+                        // Render at 3x scale for crisp PDF embedding
+                        canvas.width = w * 3;
+                        canvas.height = h * 3;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        const base64Data = await new Promise((resolve, reject) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                resolve(canvas.toDataURL('image/png'));
+                            };
+                            img.onerror = (e) => reject(e);
+                            img.src = url;
+                        });
+                        window.lastCalcPayload.pfd_png = base64Data;
+                        window.lastCalcPayload.pfd_svg = null; // Don't use backend svglib
+                        window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                        console.error('Failed to rasterize SVG in browser:', err);
+                        // Fallback to sending raw SVG to backend
+                        window.lastCalcPayload.pfd_svg = svgEl.outerHTML;
+                    }
+                }
+
                 const res = await fetch(API_BASE + '/api/generate-calculation-report', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -4473,20 +4540,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'PACE_Calculation_Report.pdf';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
+                
+                // Store the url globally for the download button
+                window.currentReportPdfUrl = url;
+                
+                // Show in the iframe
+                const placeholder = document.getElementById('report-preview-placeholder');
+                const iframe = document.getElementById('pdf-preview-iframe');
+                if (placeholder && iframe) {
+                    placeholder.style.display = 'none';
+                    iframe.src = url;
+                    iframe.style.display = 'block';
+                }
+
+                // Show the download button
+                if (dlReportBtn) {
+                    dlReportBtn.style.display = 'flex';
+                }
                 
             } catch (err) {
                 console.error(err);
-                alert(err.message);
+                alert("Error generating report: " + err.message);
             } finally {
-                reportBtn.innerHTML = btnOriginalText;
-                reportBtn.disabled = false;
+                genReportBtn.innerHTML = btnOriginalText;
+                genReportBtn.disabled = false;
             }
         });
     }
@@ -4607,461 +4684,639 @@ window.exportPFDSVG = function() {
 };
 
 window.drawPFDSVG = function(ro_results, p1Arr, nEl) {
-    if (!p1Arr || p1Arr.length === 0) p1Arr = [4,2];
-    if (!nEl) nEl = 6;
-    
-    // Fallbacks if calculation failed or hasn't run
+    if (!p1Arr || p1Arr.length === 0) {
+        const containers = document.querySelectorAll('#pfd-svg-container');
+        const emptyMsg = '<div style="display:flex; justify-content:center; align-items:center; height:300px; color:#64748b; font-size:1.1rem; font-weight:600; width:100%;">Incomplete Information for PFD</div>';
+        containers.forEach(c => {
+            c.innerHTML = emptyMsg;
+            c.style.background = 'transparent';
+            c.style.boxShadow = 'none';
+        });
+        return;
+    }
     const stages_data = (ro_results && ro_results.stages) ? ro_results.stages : [];
-    const boosters_data = (ro_results && ro_results.booster_pumps) ? ro_results.booster_pumps : [];
-    const sys_feed_press = (ro_results && ro_results.summary) ? ro_results.summary.feed_pressure_bar : 0;
+    
     let sys_feed_flow = (stages_data.length > 0) ? stages_data[0].feed_flow : 0;
     if (sys_feed_flow === 0) {
         const flowInput = document.getElementById('flow');
         if (flowInput) sys_feed_flow = parseFloat(flowInput.value) || 0;
     }
     
-    // Recycle logic detection
-    const recycleEnableInput = document.getElementById('calc-recycle-enable');
-    const recycleEnabled = recycleEnableInput ? recycleEnableInput.checked : false;
-    
-    let recycleFlow = 0;
-    let recycleRatio = 0;
-    let flowText = '';
-    if (recycleEnabled) {
-        if (window.lastCalcResult && window.lastCalcResult.recycle && window.lastCalcResult.recycle.enabled) {
-            recycleFlow = window.lastCalcResult.recycle.recycle_flow_m3h || 0;
-            recycleRatio = (window.lastCalcResult.recycle.recycle_ratio || 0) * 100;
-            flowText = `${recycleFlow.toFixed(1)} m³/h (${recycleRatio.toFixed(0)}%)`;
-        } else {
-            const ratioInput = document.getElementById('calc-recycle-ratio');
-            recycleRatio = ratioInput ? parseFloat(ratioInput.value) || 0 : 0;
-            flowText = `${recycleRatio.toFixed(0)}% Ratio`;
-        }
-    }
+    let overall_recovery = 75;
+    const recInput = document.getElementById('recovery');
+    if (recInput) overall_recovery = parseFloat(recInput.value) || 75;
 
-    let displayFeedFlow = sys_feed_flow;
-    if (recycleEnabled) {
-        if (window.lastCalcResult && window.lastCalcResult.recycle && window.lastCalcResult.recycle.enabled) {
-            displayFeedFlow = window.lastCalcResult.recycle.fresh_feed_flow_m3h;
-        } else {
-            const flowInput = document.getElementById('flow');
-            displayFeedFlow = flowInput ? parseFloat(flowInput.value) || 0 : 0;
-        }
-    }
-
-    // Build a map of booster pumps required from stage X to X+1
-    const boosterMap = {};
-    boosters_data.forEach(bp => {
-        if (bp.required) {
-            boosterMap[bp.from_stage] = bp; // Keyed by 1-indexed stage it's coming FROM
-        }
-    });
-
-    const N = {VW:140, VH:32, VGY:14, SGX:100, HW:20, PR:22, FW:28, FH:48, ML:60, MT:80, PP:80};
-    const stH = n => n * N.VH + (n - 1) * N.VGY;
-
-    function line(x1,y1,x2,y2,stroke,sw=2.5,extra='') {
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" ${extra}/>`;
-    }
-    function txt(x,y,t,anchor='middle',fill='var(--text-primary)',fs=9.5,fw='normal') {
-      return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="Inter, Roboto, sans-serif" font-size="${fs}" fill="${fill}" font-weight="${fw}">${t}</text>`;
-    }
-    function rect(x,y,w,h,rx,fill,stroke,sw=1.5) {
-      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    }
-    
-    function feedSym(cx, cy, flow) {
-      const flowTxt = flow > 0 ? txt(cx, cy-32, `${flow.toFixed(1)} m³/h`, 'middle', 'var(--accent-color)', 8.5) : '';
-      return `<g>
-        <path d="M${cx},${cy-20} L${cx-16},${cy+14} L${cx+16},${cy+14}Z" fill="var(--feed-tank-bg)" stroke="var(--feed-tank-stroke)" stroke-width="2"/>
-        ${txt(cx, cy+28, 'Feed Water', 'middle', 'var(--text-primary)', 9, 'bold')}
-        ${flowTxt}
-      </g>`;
-    }
-    
-    function filterSym(cx, cy, lbl) {
-      const [w, h] = [N.FW, N.FH];
-      let ls = '';
-      [0.25, 0.50, 0.75].forEach(f => {
-        ls += `<line x1="${cx-w/2+4}" y1="${cy-h/2+h*f}" x2="${cx+w/2-4}" y2="${cy-h/2+h*f}" stroke="var(--text-secondary)" stroke-width="1.6"/>`;
-      });
-      return `<g>
-        ${rect(cx-w/2, cy-h/2, w, h, 3, 'var(--input-bg)', 'var(--text-secondary)')}
-        <ellipse cx="${cx}" cy="${cy-h/2}" rx="${w/2}" ry="4.5" fill="var(--card-bg)" stroke="var(--text-secondary)" stroke-width="1.5"/>
-        ${ls}
-        ${txt(cx, cy+h/2+16, lbl, 'middle', 'var(--text-secondary)', 8.5)}
-      </g>`;
-    }
-    
-    function pumpSym(cx, cy, lbl, tag, press) {
-      const r = N.PR;
-      const pressTxt = press > 0 ? txt(cx, cy-r-10, `${press.toFixed(1)} bar`, 'middle', 'var(--accent-color)', 8.5, 'bold') : '';
-      return `<g>
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--input-bg)" stroke="var(--accent-color)" stroke-width="2.5"/>
-        <polygon points="${cx-r*0.55},${cy-r*0.55} ${cx-r*0.55},${cy+r*0.55} ${cx+r*0.75},${cy}" fill="var(--accent-color)"/>
-        ${txt(cx, cy+r+16, lbl, 'middle', 'var(--text-primary)', 9, 'bold')}
-        ${txt(cx, cy+r+28, tag, 'middle', 'var(--text-secondary)', 8)}
-        ${pressTxt}
-      </g>`;
-    }
-    
-    function boosterSym(cx, cy, boost_dp) {
-        const r = 18;
-        return `<g>
-            <circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--input-bg)" stroke="#f59e0b" stroke-width="2.5"/>
-            <polygon points="${cx-r*0.55},${cy-r*0.55} ${cx-r*0.55},${cy+r*0.55} ${cx+r*0.75},${cy}" fill="#f59e0b"/>
-            ${txt(cx, cy+r+16, 'Booster Pump', 'middle', '#f1f5f9', 8.5, 'bold')}
-            ${txt(cx, cy-r-10, `+${boost_dp.toFixed(1)} bar`, 'middle', '#d97706', 8.5, 'bold')}
-        </g>`;
-    }
-
-    function vesselSym(x, y, ne, si, vi, tooltipText='') {
-      const ew = (N.VW - 18) / ne;
-      let divs = '';
-      for (let i = 0; i < ne - 1; i++) {
-        divs += `<line x1="${x+9+ew*(i+1)}" y1="${y+4}" x2="${x+9+ew*(i+1)}" y2="${y+N.VH-4}" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="2,2"/>`;
-      }
-      return `<g style="cursor: pointer;">
-        <title>${tooltipText}</title>
-        ${rect(x, y, N.VW, N.VH, N.VH/2, 'var(--input-bg)', 'var(--input-border)')}
-        ${divs}
-        <rect x="${x-5}" y="${y+N.VH/2-3.5}" width="5" height="7" fill="#64748b" rx="1"/>
-        <rect x="${x+N.VW}" y="${y+N.VH/2-3.5}" width="5" height="7" fill="#64748b" rx="1"/>
-        <circle cx="${x+N.VW/2}" cy="${y+N.VH}" r="3.5" fill="#10b981"/>
-        ${txt(x+N.VW/2, y+N.VH/2+4, `Stage ${si+1} - ${vi+1}`, 'middle', 'var(--text-secondary)', 8.5)}
-      </g>`;
-    }
-    
-    function tankSym(cx, cy, lbl, fill='var(--perm-tank-bg)', stroke='var(--perm-tank-stroke)', textFill='var(--perm-tank-text)') {
-      return `<g>
-        ${rect(cx-24, cy-30, 48, 60, 3, fill, stroke)}
-        <ellipse cx="${cx}" cy="${cy-30}" rx="24" ry="6" fill="${fill}" stroke="${stroke}" stroke-width="1.6"/>
-        <ellipse cx="${cx}" cy="${cy+30}" rx="24" ry="6" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
-        ${txt(cx, cy+46, lbl, 'middle', textFill, 9, 'bold')}
-      </g>`;
-    }
-    
-    function stageBadge(cx, topY, label, fill, textFill) {
-      const bg = `<rect x="${cx-40}" y="${topY-34}" width="80" height="20" rx="4" fill="${fill}" opacity="1"/>`;
-      const lbl = txt(cx, topY-20, label, 'middle', textFill, 9.5, 'bold');
-      return `<g>${bg}${lbl}</g>`;
-    }
-
-    const maxV1 = Math.max(...p1Arr);
-    const p1CY  = N.MT + 60 + stH(maxV1) / 2;
-    const feedX = N.ML, acfX = N.ML + N.PP, mcfX = N.ML + 2*N.PP, hpX = N.ML + 3*N.PP, sx0 = hpX + 90;
-
-    let cur = sx0;
-    const p1 = p1Arr.map((nv, si) => {
-        const stX = cur, topY = p1CY - stH(nv) / 2;
-        const vs = Array.from({length: nv}, (_, vi) => ({x: stX + N.HW, y: topY + vi*(N.VH + N.VGY)}));
-        
-        cur = stX + N.HW + N.VW + N.HW + N.SGX;
-        if (boosterMap[si+1]) cur += 40; // Extra space for booster pump
-        
-        return {si, nv, stX, topY, vs, fhX: stX, chX: stX + N.HW + N.VW};
-    });
-    
-    const lastP1 = p1[p1.length - 1];
-    const p1Rx  = lastP1.chX + N.HW;
-    const permY = p1CY + stH(maxV1) / 2 + 70;
-
-    // Determine Pass 2 stage details
-    let p2 = [];
-    let p2Rx = p1Rx;
-    const pass2_stages_data = (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.stages) 
-        ? window.lastCalcResult.pass2_results.stages 
-        : [];
-    // hasPass2: true when last result was a 2P-RO calculation
+    let p2Arr = [];
     const hasPass2 = !!(window.lastCalcResult && window.lastCalcResult.pass2_results);
-
+    
     if (hasPass2) {
-        const sx1 = p1Rx + 190; // Start X for Pass 2 (leaves space for tank & pump)
-        const maxV2 = Math.max(...p2Arr);
-        let cur2 = sx1;
-        p2 = p2Arr.map((nv, si) => {
-            const stX = cur2, topY = p1CY - stH(nv) / 2;
-            const vs = Array.from({length: nv}, (_, vi) => ({x: stX + N.HW, y: topY + vi*(N.VH + N.VGY)}));
-            cur2 = stX + N.HW + N.VW + N.HW + N.SGX;
-            return {si, nv, stX, topY, vs, fhX: stX, chX: stX + N.HW + N.VW};
-        });
-        p2Rx = p2[p2.length - 1].chX + N.HW;
-    }
-
-    const rEdge = Math.max(1000, (hasPass2 ? p2Rx : p1Rx) + 200);
-    const bEdge = permY + 110;
-
-    let s = '';
-    
-    // Background
-    s += `<rect width="100%" height="100%" fill="var(--card-bg)"/>`;
-
-    // Header Area
-    s += `<rect x="0" y="0" width="${rEdge}" height="60" fill="var(--input-bg)"/>`;
-    s += `<line x1="0" y1="60" x2="${rEdge}" y2="60" stroke="var(--card-border)" stroke-width="1.5"/>`;
-    const trainInput = document.getElementById('calc-tech-train');
-    const trainName = trainInput ? trainInput.options[trainInput.selectedIndex].text : 'RO';
-    s += txt(20, 26, `System Process Flow Diagram (${trainName})`, 'start', 'var(--text-primary)', 14, 'bold');
-    
-    let subTitle = `Pass 1 Array | ${p1Arr.join(':')} configuration | ${nEl} Elements/Vessel`;
-    if (trainName.includes('UF')) {
-        subTitle = `UF + ` + subTitle;
-    }
-    s += txt(20, 46, subTitle, 'start', 'var(--text-secondary)', 10);
-
-    // Pre-treatment lines
-    s += line(feedX+16, p1CY, acfX-N.FW/2, p1CY, 'var(--accent-color)', 2.5);
-    s += line(acfX+N.FW/2, p1CY, mcfX-N.FW/2, p1CY, 'var(--accent-color)', 2.5);
-    s += line(mcfX+N.FW/2, p1CY, hpX-N.PR, p1CY, 'var(--accent-color)', 2.5);
-    s += line(hpX+N.PR, p1CY, p1[0].fhX, p1CY, 'var(--accent-color)', 2.5);
-
-    // Symbols
-    s += feedSym(feedX, p1CY, displayFeedFlow);
-    s += filterSym(acfX, p1CY, 'ASF');
-    s += filterSym(mcfX, p1CY, 'MCF');
-    s += pumpSym(hpX, p1CY, 'HP Pump', 'Feed HP', sys_feed_press);
-
-    // Stages
-    p1.forEach((st, si) => {
-        const {nv, topY, vs, fhX, chX} = st;
-        const sH = stH(nv);
-        const cx = fhX + N.HW + N.VW/2;
-        
-        const stageData = stages_data.find(sd => sd.stage === si+1);
-
-        // Stage Header & Metrics
-        s += stageBadge(cx, topY, 'Pass 1 - Stage ' + (si+1), 'var(--card-border)', 'var(--text-primary)');
-
-        // Vertical Manifolds
-        s += `<line x1="${fhX+N.HW/2}" y1="${topY-4}" x2="${fhX+N.HW/2}" y2="${topY+sH+4}" stroke="var(--accent-color)" stroke-width="6" stroke-linecap="round"/>`; // Feed manifold
-        s += `<line x1="${chX+N.HW/2}" y1="${topY-4}" x2="${chX+N.HW/2}" y2="${topY+sH+4}" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>`; // Conc manifold
-
-        // Vessels
-        vs.forEach((v, vi) => {
-            let tt = `Stage ${si+1} - Vessel ${vi+1}`;
-            if (stageData) {
-                tt += `\nAvg Feed: ${(stageData.feed_flow / nv).toFixed(2)} m³/h`;
-                tt += `\nAvg Perm: ${(stageData.perm_flow / nv).toFixed(2)} m³/h`;
-                tt += `\nStage Recovery: ${(stageData.recovery * 100).toFixed(1)}%`;
-            }
-            s += vesselSym(v.x, v.y, nEl, si, vi, tt);
-            s += line(v.x+N.VW/2, v.y+N.VH+4, v.x+N.VW/2, permY, '#10b981', 1.8, 'stroke-dasharray="5,3"');
-        });
-
-        // Interstage connection
-        const next = p1[si+1];
-        if (next) {
-            const fromX = chX + N.HW;
-            const toX = next.fhX;
-            const bst = boosterMap[si+1];
-            
-            if (bst) {
-                // Draw Booster
-                const midX = (fromX + toX) / 2;
-                s += line(fromX, p1CY, midX-18, p1CY, '#ef4444', 2.5); // Red going in
-                s += line(midX+18, p1CY, toX, p1CY, 'var(--accent-color)', 2.5);   // Blue going out (boosted)
-                s += boosterSym(midX, p1CY, bst.boost_dp_bar);
-            } else {
-                // No Booster
-                s += line(fromX, p1CY, toX, p1CY, '#ef4444', 2.5);
-                s += txt((fromX+toX)/2, p1CY-8, 'Concentrate', 'middle', '#ef4444', 8, 'italic');
-            }
+        const elP2Stages = document.getElementById('calc-pass2-stages');
+        let np2 = elP2Stages ? parseInt(elP2Stages.value) || 1 : 1;
+        for (let i = 1; i <= np2; i++) {
+            const vi = document.getElementById('calc-pass2-vessels-s' + i);
+            p2Arr.push(vi ? parseInt(vi.value) || 2 : 2);
         }
+    }
+
+    const passesArray = [p1Arr];
+    if (hasPass2) passesArray.push(p2Arr);
+
+    const state = {
+        passes: passesArray,
+        theme: {
+            name: 'classic-pace',
+            canvasBg: '#CEDDFF',
+            vesselFill: '#FFFFF0',
+            vesselStroke: '#000000',
+            feed: '#555555',
+            permeate: '#3B50D0',
+            concentrate: '#C00000',
+            pump: '#293990',
+            label: '#000000'
+        },
+        geo: {
+            vesselW: 110,
+            vesselH: 32,
+            vGap: 18,
+            headerMargin: 26,
+            manifoldMargin: 26,
+            stageExitPad: 36,
+            stageGap: 130,
+            passGap: 72,
+            passHeaderMargin: 50,
+            feedStub: 80,
+            outletStub: 50
+        },
+        animateFlow: false,
+        calc: {
+            feedFlow: sys_feed_flow,
+            recovery: overall_recovery,
+            showFlows: true
+        }
+    };
+
+    // --- SVG Rendering Core ---
+function buildSVG() {
+  const COLORS = state.theme;
+  const GEO = state.geo;
+  const centerY = 320;
+  
+  let x = 60;
+  let fullMarkup = '';
+  let passExits = [];
+  let sysMaxTop = centerY;
+  let sysMaxBottom = centerY;
+  let pumpsMarkup = '';
+
+  // Arrow markers definition
+  const arrowMarkerDefs = `
+    <defs>
+      <marker id="pfd-ah-feed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+        <path d="M2 1 L8 5 L2 9 Z" fill="${COLORS.feed}" />
+      </marker>
+      <marker id="pfd-ah-permeate" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+        <path d="M2 1 L8 5 L2 9 Z" fill="${COLORS.permeate}" />
+      </marker>
+      <marker id="pfd-ah-concentrate" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+        <path d="M2 1 L8 5 L2 9 Z" fill="${COLORS.concentrate}" />
+      </marker>
+    </defs>
+  `;
+
+  // Draw high-pressure pump icon
+  function pumpIcon(cx, cy, scale = 1, labelText = 'HP PUMP') {
+    const isBooster = labelText === 'BOOSTER';
+    
+    let baseD = isBooster 
+      ? "M -16 16 L -22 28 L 22 28 L 16 16 Z" 
+      : "M -38 16 L -44 28 L 22 28 L 16 16 Z";
+    
+    let baseRectX = isBooster ? -24 : -46;
+    let baseRectW = isBooster ? 48 : 70;
+    
+    let motorMarkup = '';
+    if (!isBooster) {
+      motorMarkup = `
+        <!-- Motor housing -->
+        <rect x="-42" y="-14" width="24" height="28" rx="3" fill="#2B3B98" stroke="#ffffff" stroke-width="2" />
+        <!-- Cooling fins -->
+        <line x1="-36" y1="-14" x2="-36" y2="14" stroke="#ffffff" stroke-width="1.5" />
+        <line x1="-30" y1="-14" x2="-30" y2="14" stroke="#ffffff" stroke-width="1.5" />
+        <line x1="-24" y1="-14" x2="-24" y2="14" stroke="#ffffff" stroke-width="1.5" />
+        <!-- Motor coupling -->
+        <rect x="-18" y="-6" width="6" height="12" fill="#2B3B98" stroke="#ffffff" stroke-width="2" />
+      `;
+    }
+
+    const textX = isBooster ? 0 : -11;
+
+    return `
+      <g class="pfd-pump" transform="translate(${cx},${cy}) scale(${scale})" cursor="pointer" data-type="pump" data-name="${labelText}">
+        <!-- Base -->
+        <path d="${baseD}" fill="#2B3B98" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" />
+        <rect x="${baseRectX}" y="28" width="${baseRectW}" height="4" fill="#2B3B98" stroke="#ffffff" stroke-width="2" />
+        
+        ${motorMarkup}
+        
+        <!-- Volute & Discharge Path -->
+        <path d="M 30 -18 L 0 -18 A 18 18 0 1 0 16.1 -8 L 30 -8 Z" fill="#2B3B98" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" />
+        
+        <!-- Discharge Flange -->
+        <rect x="30" y="-21" width="6" height="16" fill="#2B3B98" stroke="#ffffff" stroke-width="2" />
+        
+        <!-- Inner Motor / Suction Eye -->
+        <circle cx="0" cy="0" r="8" fill="#2B3B98" stroke="#ffffff" stroke-width="2" />
+        
+        <!-- Text label -->
+        <text x="${textX}" y="44" font-size="11" font-weight="700" fill="${COLORS.label}" text-anchor="middle" font-family="Outfit, sans-serif">${labelText}</text>
+      </g>
+    `;
+  }
+
+  // Draw mixer icon
+  function mixerIcon(cx, cy, scale = 1) {
+    return `
+      <g class="pfd-mixer" transform="translate(${cx},${cy}) scale(${scale})" cursor="pointer" data-type="mixer">
+        <circle cx="0" cy="0" r="10" fill="#FFFFF0" stroke="${COLORS.vesselStroke}" stroke-width="2" />
+        <line x1="-7" y1="-7" x2="7" y2="7" stroke="${COLORS.vesselStroke}" stroke-width="2" />
+        <line x1="-7" y1="7" x2="7" y2="-7" stroke="${COLORS.vesselStroke}" stroke-width="2" />
+      </g>
+    `;
+  }
+
+  // Draw vessel shape
+  function vesselShape(vx, vy, vw, vh, passIdx, stageIdx, vesselIdx) {
+    const midY = vy + vh / 2;
+    const label = `PV #${vesselIdx + 1}`;
+    
+    // Construct the outer shell path
+    const p1x = vx, p1y = vy;
+    const p2x = vx + 10, p2y = vy;
+    const p3x = vx + 16, p3y = vy + 4;
+    const p4x = vx + vw - 16, p4y = vy + 4;
+    const p5x = vx + vw - 10, p5y = vy;
+    const p6x = vx + vw, p6y = vy;
+    const p7x = vx + vw, p7y = vy + vh;
+    const p8x = vx + vw - 10, p8y = vy + vh;
+    const p9x = vx + vw - 16, p9y = vy + vh - 4;
+    const p10x = vx + 16, p10y = vy + vh - 4;
+    const p11x = vx + 10, p11y = vy + vh;
+    const p12x = vx, p12y = vy + vh;
+
+    const pathD = `M ${p1x} ${p1y} L ${p2x} ${p2y} L ${p3x} ${p3y} L ${p4x} ${p4y} L ${p5x} ${p5y} L ${p6x} ${p6y} L ${p7x} ${p7y} L ${p8x} ${p8y} L ${p9x} ${p9y} L ${p10x} ${p10y} L ${p11x} ${p11y} L ${p12x} ${p12y} Z`;
+
+    let s = `
+      <g class="pfd-vessel" data-pass="${passIdx}" data-stage="${stageIdx}" data-vessel="${vesselIdx}">
+        <path d="${pathD}" fill="${COLORS.vesselFill}" stroke="${COLORS.vesselStroke}" stroke-width="1.5" stroke-linejoin="round" />
+        
+        <!-- Vertical lines for end caps -->
+        <line x1="${p2x}" y1="${p2y}" x2="${p11x}" y2="${p11y}" stroke="${COLORS.vesselStroke}" stroke-width="1.5" />
+        <line x1="${p5x}" y1="${p5y}" x2="${p8x}" y2="${p8y}" stroke="${COLORS.vesselStroke}" stroke-width="1.5" />
+        
+        <!-- Diagonal membrane line (top-left to bottom-right) -->
+        <line x1="${p3x}" y1="${p3y}" x2="${p9x}" y2="${p9y}" stroke="${COLORS.vesselStroke}" stroke-width="2.5" />
+        
+        <!-- Label with background to mask the diagonal line -->
+        <rect x="${vx + vw / 2 - 20}" y="${midY - 8}" width="40" height="16" fill="${COLORS.vesselFill}" />
+        <text x="${vx + vw / 2}" y="${midY + 4}" font-size="11" fill="${COLORS.label}" font-weight="600" text-anchor="middle" font-family="Inter, sans-serif" pointer-events="none">${label}</text>
+      </g>
+    `;
+    return s;
+  }
+
+  // Create stream paths (orthogonal routing) for animations
+  function streamPath(points, color, flowClass = '', addMarker = false) {
+    if (points.length < 2) return '';
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      d += ` L ${points[i].x} ${points[i].y}`;
+    }
+    const animClass = state.animateFlow ? 'flow-animating' : '';
+    let markerAttr = '';
+    if (addMarker) {
+      if (color === COLORS.feed) markerAttr = 'marker-end="url(#pfd-ah-feed)"';
+      else if (color === COLORS.permeate) markerAttr = 'marker-end="url(#pfd-ah-permeate)"';
+      else if (color === COLORS.concentrate) markerAttr = 'marker-end="url(#pfd-ah-concentrate)"';
+    }
+    return `<path d="${d}" stroke="${color}" fill="none" stroke-width="2" class="stream-path ${animClass} ${flowClass}" ${markerAttr} />`;
+  }
+
+  // Linear calculations model values
+  const Q_f = state.calc.feedFlow;
+  const Y_overall = state.calc.recovery / 100;
+  
+  // Calculate flow rates per pass
+  // Assuming Pass 1 recovery = Y_overall, Pass 2 recovery = 0.85
+  const passFlows = [];
+  let currentFeed = Q_f;
+  
+  state.passes.forEach((stages, pi) => {
+    const passRec = pi === 0 ? Y_overall : 0.85; // Pass 2+ is treated as 2nd pass polishing
+    const passPerm = currentFeed * passRec;
+    const passConc = currentFeed - passPerm;
+    
+    // Stage recovery distribution: 1 - (1-Y_pass)^(1/k)
+    const k = stages.length;
+    const stageRec = 1 - Math.pow(1 - passRec, 1 / k);
+    
+    const stageFlows = [];
+    let stageFeed = currentFeed;
+    
+    stages.forEach((v, si) => {
+      const stagePerm = stageFeed * stageRec;
+      const stageConc = stageFeed - stagePerm;
+      stageFlows.push({
+        feed: stageFeed,
+        permeate: stagePerm,
+        concentrate: stageConc
+      });
+      stageFeed = stageConc; // Next stage feed is current stage concentrate
+    });
+    
+    passFlows.push({
+      feed: currentFeed,
+      permeate: passPerm,
+      concentrate: passConc,
+      stages: stageFlows
+    });
+    
+    currentFeed = passPerm; // Double pass: 2nd pass feed is 1st pass permeate
+  });
+
+  let hasUF = false;
+  const trainSelect = document.getElementById('calc-tech-train');
+  if (trainSelect) {
+      hasUF = trainSelect.value.includes('UF');
+  } else if (window.lastCalcPayload && window.lastCalcPayload.technology_train) {
+      hasUF = window.lastCalcPayload.technology_train.includes('UF');
+  }
+
+  let ufShift = hasUF ? 80 : 0;
+
+  // Render main inlet stream with offset for pump suction/discharge
+  const pumpCy = centerY + 13;
+  const pumpCx = x + GEO.feedStub + 34 + ufShift;
+  
+  const mixCx = x - 10;
+  const mixCy = pumpCy;
+
+  // The pump casing extends to pumpCx + 36. We place the start of the manifold (x) well past it.
+  const newX = pumpCx + 90;
+  const feedInXFirst = newX - GEO.manifoldMargin;
+
+  // Raw feed into mixer (stops at left edge of circle)
+  fullMarkup += streamPath([{ x: mixCx - 40, y: pumpCy }, { x: mixCx - 10, y: pumpCy }], COLORS.feed, '', true);
+  
+  let ufMarkup = '';
+  if (hasUF) {
+      const ufCx = (mixCx + 10 + pumpCx - 46) / 2;
+      const ufCy = pumpCy;
+      
+      // Draw UF Module Box
+      ufMarkup += `
+        <g transform="translate(${ufCx},${ufCy})">
+          <rect x="-24" y="-24" width="48" height="48" fill="#f8fafc" stroke="#334155" stroke-width="2" rx="4"/>
+          <text x="0" y="4" font-size="14" font-weight="800" fill="#334155" text-anchor="middle" font-family="Outfit, sans-serif">UF</text>
+          <text x="0" y="16" font-size="8" font-weight="600" fill="#64748b" text-anchor="middle" font-family="Outfit, sans-serif">Pre-treat</text>
+        </g>
+      `;
+      // Path from mixer to UF
+      fullMarkup += streamPath([{ x: mixCx + 10, y: pumpCy }, { x: ufCx - 24, y: pumpCy }], COLORS.feed, '', true);
+      // Path from UF to Pump
+      fullMarkup += streamPath([{ x: ufCx + 24, y: pumpCy }, { x: pumpCx - 46, y: pumpCy }], COLORS.feed, '', true);
+  } else {
+      // Mixed line from mixer to suction (starts at right edge of circle, stops at left edge of pump motor)
+      fullMarkup += streamPath([{ x: mixCx + 10, y: pumpCy }, { x: pumpCx - 46, y: pumpCy }], COLORS.feed, '', true);
+  }
+  
+  // Line out of discharge (top)
+  fullMarkup += streamPath([{ x: pumpCx, y: centerY }, { x: feedInXFirst, y: centerY }], COLORS.feed);
+  
+  fullMarkup += `<text x="${mixCx - 36}" y="${pumpCy - 8}" font-size="11" font-weight="600" fill="${COLORS.label}" font-family="Outfit, sans-serif">Feed</text>`;
+  
+  if (state.calc.showFlows) {
+    fullMarkup += `<text x="${mixCx - 36}" y="${pumpCy + 16}" font-size="9" font-weight="500" fill="${COLORS.feed}" font-family="Fira Code, monospace">${Q_f.toFixed(1)} m³/h</text>`;
+  }
+
+  pumpsMarkup += mixerIcon(mixCx, mixCy, 1);
+  pumpsMarkup += ufMarkup;
+  // Draw main feed pump (added to pumpsMarkup to render on top of the flow line)
+  pumpsMarkup += pumpIcon(pumpCx, pumpCy, 1, 'FEED PUMP');
+  
+  x = newX;
+
+  // Render each pass
+  state.passes.forEach((passStages, pi) => {
+    const passFlow = passFlows[pi];
+    const maxVesselsInPass = Math.max(...passStages.map(v => v > 4 ? 4 : v));
+    const passHeight = maxVesselsInPass * GEO.vesselH + (maxVesselsInPass - 1) * GEO.vGap;
+    const firstStageStartY = centerY - passHeight / 2;
+    
+    fullMarkup += `
+      <g transform="translate(${x}, ${firstStageStartY - GEO.headerMargin - GEO.passHeaderMargin})">
+        <text x="0" y="0" font-size="13" font-weight="800" fill="${COLORS.label}" font-family="Outfit, sans-serif">PASS ${pi + 1}</text>
+        <line x1="0" y1="4" x2="54" y2="4" stroke="${COLORS.label}" stroke-width="2" />
+      </g>
+    `;
+
+    let stageX = x;
+    let feedFromX = stageX - 26;
+    let feedFromY = centerY;
+    let stagePermExits = [];
+    let lastConcExit = null;
+    let passMaxTop = centerY;
+    let passMaxBottom = centerY;
+
+    passStages.forEach((stageVessels, si) => {
+      const stageFlow = passFlow.stages[si];
+      const feedColor = si === 0 ? (pi === 0 ? COLORS.feed : COLORS.permeate) : COLORS.concentrate;
+      const permHeaderY = firstStageStartY - GEO.headerMargin;
+      const concManifoldY = Math.max(firstStageStartY + passHeight + GEO.manifoldMargin, centerY + 80);
+      const stageExitX = stageX + GEO.vesselW + 30 + GEO.stageExitPad;
+
+      passMaxTop = Math.min(passMaxTop, permHeaderY);
+      passMaxBottom = Math.max(passMaxBottom, concManifoldY);
+
+      fullMarkup += `<text x="${stageX + GEO.vesselW / 2}" y="${firstStageStartY - 14}" font-size="11" font-weight="700" fill="${COLORS.label}" text-anchor="middle" font-family="Outfit, sans-serif">Stage ${si + 1}</text>`;
+
+      const feedInX = stageX - 26;
+      if (si === 0) {
+        fullMarkup += streamPath([{ x: feedFromX, y: feedFromY }, { x: feedInX, y: centerY }], feedColor);
+      } else {
+        const upX = feedFromX + 20;
+        const pumpCy = centerY + 13;
+        const pumpCx = upX + 34;
+        
+        fullMarkup += streamPath([
+          { x: feedFromX, y: feedFromY },
+          { x: upX, y: feedFromY },
+          { x: upX, y: pumpCy },
+          { x: pumpCx - 18, y: pumpCy }
+        ], feedColor, '', true);
+        
+        fullMarkup += streamPath([
+          { x: pumpCx, y: centerY },
+          { x: feedInX, y: centerY }
+        ], feedColor);
+        
+        pumpsMarkup += pumpIcon(pumpCx, pumpCy, 1, 'BOOSTER');
+        
+        if (state.calc.showFlows) {
+          fullMarkup += `<text x="${upX + 4}" y="${pumpCy - 6}" font-size="8.5" font-weight="500" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">${stageFlow.feed.toFixed(1)}</text>`;
+        }
+      }
+
+      const displayCount = stageVessels > 4 ? 4 : stageVessels;
+      let renderSlots = [];
+      if (stageVessels <= 4) {
+        for (let i=0; i<stageVessels; i++) renderSlots.push({ type: 'vessel', labelIdx: i });
+      } else {
+        renderSlots.push({ type: 'vessel', labelIdx: 0 });
+        renderSlots.push({ type: 'vessel', labelIdx: 1 });
+        renderSlots.push({ type: 'dots' });
+        renderSlots.push({ type: 'vessel', labelIdx: stageVessels - 1 });
+      }
+
+      let pYs = [];
+      let cYs = [];
+      
+      let feedMinY = centerY;
+      let feedMaxY = centerY;
+
+      renderSlots.forEach((slot, vi) => {
+        const vy = firstStageStartY + vi * (GEO.vesselH + GEO.vGap);
+        const vyMid = vy + GEO.vesselH / 2;
+        
+        feedMinY = Math.min(feedMinY, vyMid);
+        feedMaxY = Math.max(feedMaxY, vyMid);
+
+        if (slot.type === 'vessel') {
+          fullMarkup += streamPath([{ x: feedInX, y: vyMid }, { x: stageX, y: vyMid }], feedColor, '', true);
+          fullMarkup += vesselShape(stageX, vy, GEO.vesselW, GEO.vesselH, pi, si, slot.labelIdx);
+          const pY = vy + GEO.vesselH * 0.25;
+          const cY = vy + GEO.vesselH * 0.75;
+          pYs.push(pY);
+          cYs.push(cY);
+          fullMarkup += streamPath([{ x: stageX + GEO.vesselW, y: pY }, { x: stageX + GEO.vesselW + 14, y: pY }], COLORS.permeate, '', true);
+          fullMarkup += streamPath([{ x: stageX + GEO.vesselW, y: cY }, { x: stageX + GEO.vesselW + 30, y: cY }], COLORS.concentrate, '', true);
+        } else if (slot.type === 'dots') {
+          // Add a short feed stub pointing to the empty space for the dots
+          fullMarkup += streamPath([{ x: feedInX, y: vyMid }, { x: stageX - 10, y: vyMid }], feedColor);
+          fullMarkup += `<text x="${stageX + GEO.vesselW / 2}" y="${vyMid + 6}" font-size="24" font-weight="700" fill="${COLORS.label}" text-anchor="middle" font-family="Outfit, sans-serif">⋮</text>`;
+        }
+      });
+
+      if (feedMinY < feedMaxY) {
+        // Vertical feed distribution line
+        fullMarkup += streamPath([{ x: feedInX, y: feedMinY }, { x: feedInX, y: feedMaxY }], feedColor);
+      }
+
+      const blueBusX = stageX + GEO.vesselW + 14;
+      const redBusX = stageX + GEO.vesselW + 30;
+
+      // Vertical collecting manifolds
+      if (displayCount > 1) {
+        fullMarkup += streamPath([{ x: blueBusX, y: pYs[0] }, { x: blueBusX, y: pYs[pYs.length - 1] }], COLORS.permeate);
+        fullMarkup += streamPath([{ x: redBusX, y: cYs[0] }, { x: redBusX, y: cYs[cYs.length - 1] }], COLORS.concentrate);
+      }
+      
+      const blueMergeY = (pYs[0] + pYs[pYs.length - 1]) / 2;
+      const redMergeY = (cYs[0] + cYs[cYs.length - 1]) / 2;
+
+      // Pipe to header/manifold exits
+      fullMarkup += streamPath([
+        { x: blueBusX, y: blueMergeY },
+        { x: blueBusX, y: permHeaderY },
+        { x: stageExitX, y: permHeaderY }
+      ], COLORS.permeate);
+      
+      fullMarkup += streamPath([
+        { x: redBusX, y: redMergeY },
+        { x: redBusX, y: concManifoldY },
+        { x: stageExitX, y: concManifoldY }
+      ], COLORS.concentrate);
+
+      stagePermExits.push({ x: stageExitX, y: permHeaderY });
+      lastConcExit = { x: stageExitX, y: concManifoldY };
+
+      // Flow indicators next to stage exit lines
+      if (state.calc.showFlows) {
+        fullMarkup += `<text x="${stageExitX - 22}" y="${permHeaderY - 6}" font-size="8.5" font-weight="600" fill="${COLORS.permeate}" font-family="Fira Code, monospace">${stageFlow.permeate.toFixed(1)}</text>`;
+        fullMarkup += `<text x="${stageExitX - 22}" y="${concManifoldY + 12}" font-size="8.5" font-weight="600" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">${stageFlow.concentrate.toFixed(1)}</text>`;
+      }
+
+      // Advance to next stage coordinate
+      if (si < passStages.length - 1) {
+        const nextX = stageExitX + GEO.stageGap;
+        feedFromX = stageExitX;
+        feedFromY = concManifoldY;
+        stageX = nextX;
+      } else {
+        stageX = stageExitX;
+      }
     });
 
-    // Permeate Collection & Pass 2 transition
-    const p1PermLx = p1[0].vs[0].x + N.VW/2;
-    const p1PermRx = p1[p1.length-1].vs[0].x + N.VW/2;
+    // PASS HEADERS COLLECTING
+    const passHeaderY = passMaxTop - GEO.passHeaderMargin + GEO.headerMargin;
+    let minHx = Infinity, maxHx = -Infinity;
     
-    if (hasPass2) {
-        // Draw Pass 1 Permeate to Interstage Tank
-        s += line(p1PermLx, permY, p1Rx+36, permY, '#10b981', 3.5);
-        s += `<polygon points="${p1Rx+36},${permY-6} ${p1Rx+36},${permY+6} ${p1Rx+46},${permY}" fill="#10b981"/>`;
-        
-        let p1PermFlow = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass1_results && window.lastCalcResult.pass1_results.summary) {
-            p1PermFlow = window.lastCalcResult.pass1_results.summary.perm_flow;
-        }
-        
-        s += txt(p1PermRx+25, permY+16, 'Pass 1 Permeate', 'middle', '#10b981', 9.5, 'bold');
-        if (p1PermFlow > 0) {
-            s += txt(p1PermRx+25, permY+28, `${p1PermFlow.toFixed(1)} m³/h`, 'middle', '#10b981', 9.5, 'bold');
-        }
-        
-        // Interstage Tank
-        s += tankSym(p1Rx+70, permY, 'Interstage Tank', 'var(--perm-tank-bg)', 'var(--perm-tank-stroke)', 'var(--perm-tank-text)');
-        
-        const condEnabled = document.getElementById('calc-cond-enabled') ? document.getElementById('calc-cond-enabled').value === 'true' : false;
-        if (condEnabled) {
-            s += txt(p1Rx+70, permY+44, 'pH Adj.', 'middle', '#ea580c', 8.5, 'bold');
-        }
-        
-        // Line from Interstage Tank to Pass 2 HP Pump
-        s += line(p1Rx+70, permY-36, p1Rx+70, p1CY, '#10b981', 2.5);
-        s += line(p1Rx+70, p1CY, p1Rx+116, p1CY, '#10b981', 2.5);
-        
-        // Pass 2 HP Pump
-        let p2FeedPress = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.summary) {
-            p2FeedPress = window.lastCalcResult.pass2_results.summary.feed_pressure_bar;
-        }
-        s += pumpSym(p1Rx+130, p1CY, 'HP Pump 2', 'Pass 2 HP', p2FeedPress);
-        s += line(p1Rx+130+N.PR, p1CY, p2[0].fhX, p1CY, '#10b981', 2.5);
-        
-        // Draw Pass 2 Stages
-        p2.forEach((st, si) => {
-            const {nv, topY, vs, fhX, chX} = st;
-            const sH = stH(nv);
-            const cx = fhX + N.HW + N.VW/2;
-            
-            const stageData = pass2_stages_data.find(sd => sd.stage === si+1);
-
-            // Stage Header & Metrics
-            s += stageBadge(cx, topY, 'Pass 2 - Stage ' + (si+1), 'var(--card-border)', 'var(--text-primary)');
-
-            // Vertical Manifolds
-            s += `<line x1="${fhX+N.HW/2}" y1="${topY-4}" x2="${fhX+N.HW/2}" y2="${topY+sH+4}" stroke="#10b981" stroke-width="6" stroke-linecap="round"/>`; // Feed manifold (Pass 1 permeate)
-            s += `<line x1="${chX+N.HW/2}" y1="${topY-4}" x2="${chX+N.HW/2}" y2="${topY+sH+4}" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>`; // Conc manifold
-
-            // Vessels
-            vs.forEach((v, vi) => {
-                let tt = `Pass 2 Stage ${si+1} - Vessel ${vi+1}`;
-                if (stageData) {
-                    tt += `\nAvg Feed: ${(stageData.feed_flow / nv).toFixed(2)} m³/h`;
-                    tt += `\nAvg Perm: ${(stageData.perm_flow / nv).toFixed(2)} m³/h`;
-                    tt += `\nStage Recovery: ${(stageData.recovery * 100).toFixed(1)}%`;
-                }
-                s += vesselSym(v.x, v.y, p2NEl, si + p1.length, vi, tt);
-                s += line(v.x+N.VW/2, v.y+N.VH+4, v.x+N.VW/2, permY, '#10b981', 1.8, 'stroke-dasharray="5,3"');
-            });
-
-            // Interstage connection for Pass 2 (if multiple stages exist in Pass 2)
-            const next = p2[si+1];
-            if (next) {
-                const fromX = chX + N.HW;
-                const toX = next.fhX;
-                s += line(fromX, p1CY, toX, p1CY, '#ef4444', 2.5);
-                s += txt((fromX+toX)/2, p1CY-8, 'Concentrate', 'middle', '#ef4444', 8, 'italic');
-            }
-        });
-
-        // Pass 2 Permeate collection
-        const p2PermLx = p2[0].vs[0].x + N.VW/2;
-        const p2PermRx = p2[p2.length-1].vs[0].x + N.VW/2;
-        s += line(p2PermLx, permY, p2PermRx+56, permY, '#10b981', 3.5);
-        s += `<polygon points="${p2PermRx+56},${permY-6} ${p2PermRx+56},${permY+6} ${p2PermRx+66},${permY}" fill="#10b981"/>`;
-        
-        let p2PermFlow = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.summary) {
-            p2PermFlow = window.lastCalcResult.pass2_results.summary.perm_flow;
-        }
-        
-        s += txt(p2PermRx+25, permY+16, 'Final Permeate', 'middle', '#10b981', 9.5, 'bold');
-        if (p2PermFlow > 0) {
-            s += txt(p2PermRx+25, permY+28, `${p2PermFlow.toFixed(1)} m³/h`, 'middle', '#10b981', 9.5, 'bold');
-        }
-        
-        s += tankSym(p2PermRx+90, permY, 'Permeate Tank', 'var(--perm-tank-bg)', 'var(--perm-tank-stroke)', 'var(--perm-tank-text)');
-
-        // Pass 2 Reject collection
-        s += line(p2Rx, p1CY, p2Rx+56, p1CY, '#ef4444', 3.5);
-        s += `<polygon points="${p2Rx+56},${p1CY-6} ${p2Rx+56},${p1CY+6} ${p2Rx+66},${p1CY}" fill="#ef4444"/>`;
-        s += txt(p2Rx+25, p1CY+16, 'Pass 2 Reject', 'middle', '#ef4444', 9.5, 'bold');
-        
-        let p2ConcFlow = 0;
-        if (window.lastCalcResult && window.lastCalcResult.pass2_results && window.lastCalcResult.pass2_results.summary) {
-            p2ConcFlow = window.lastCalcResult.pass2_results.summary.conc_flow;
-        }
-        if (p2ConcFlow > 0) {
-            s += txt(p2Rx+25, p1CY+28, `${p2ConcFlow.toFixed(1)} m³/h`, 'middle', '#ef4444', 9.5, 'bold');
-        }
-        s += tankSym(p2Rx+90, p1CY, 'Pass 2 Reject', 'var(--rej-tank-bg)', 'var(--rej-tank-stroke)', 'var(--rej-tank-text)');
-
-    } else {
-        // Standard Single-Pass Permeate Collection
-        s += line(p1PermLx, permY, p1PermRx+56, permY, '#10b981', 3.5);
-        s += `<polygon points="${p1PermRx+56},${permY-6} ${p1PermRx+56},${permY+6} ${p1PermRx+66},${permY}" fill="#10b981"/>`;
-        
-        if (ro_results && ro_results.summary) {
-            s += txt(p1PermRx+25, permY+16, 'Permeate Stream', 'middle', '#10b981', 9.5, 'bold');
-            s += txt(p1PermRx+25, permY+28, `${ro_results.summary.perm_flow.toFixed(1)} m³/h`, 'middle', '#10b981', 9.5, 'bold');
-        }
-        s += tankSym(p1PermRx+90, permY, 'Permeate Tank', 'var(--perm-tank-bg)', 'var(--perm-tank-stroke)', 'var(--perm-tank-text)');
-    }
-
-    // Pass 1 Reject (always present, but if recycle is enabled, it has recycle loop)
-    const cX = p1Rx;
-    s += line(cX, p1CY, cX+96, p1CY, '#ef4444', 3.5);
-    s += `<polygon points="${cX+96},${p1CY-6} ${cX+96},${p1CY+6} ${cX+106},${p1CY}" fill="#ef4444"/>`;
+    stagePermExits.forEach(p => {
+      fullMarkup += streamPath([{ x: p.x, y: p.y }, { x: p.x, y: passHeaderY }], COLORS.permeate);
+      minHx = Math.min(minHx, p.x);
+      maxHx = Math.max(maxHx, p.x);
+    });
     
-    const lastStage = stages_data.length > 0 ? stages_data[stages_data.length-1] : null;
-    let netRejectFlow = lastStage ? lastStage.conc_flow : 0;
-    if (recycleEnabled && lastStage) {
-        netRejectFlow = Math.max(0, lastStage.conc_flow - recycleFlow);
+    // Connect all permeate lines horizontally
+    fullMarkup += streamPath([{ x: minHx, y: passHeaderY }, { x: maxHx, y: passHeaderY }], COLORS.permeate);
+
+    passExits.push({
+      permeateX: maxHx,
+      permeateY: passHeaderY,
+      concentrateX: lastConcExit.x,
+      concentrateY: lastConcExit.y
+    });
+
+    sysMaxTop = Math.min(sysMaxTop, passHeaderY);
+    sysMaxBottom = Math.max(sysMaxBottom, lastConcExit.y);
+
+    // Coordinate prep for next pass
+    x = stageX + GEO.passGap;
+
+    // Double Pass connection: Pass 1 Permeate -> Pump -> Pass 2 Feed
+    if (pi < state.passes.length - 1) {
+      const p1ExitX = maxHx;
+      const pumpCy = centerY + 13;
+      const pumpCx = p1ExitX + 78;
+      
+      const newX = pumpCx + 90;
+      const feedInXPass = newX - GEO.manifoldMargin;
+      
+      // Line into suction (center) - stops at left edge of motor housing
+      fullMarkup += streamPath([
+        { x: p1ExitX, y: passHeaderY },
+        { x: p1ExitX + 18, y: passHeaderY },
+        { x: p1ExitX + 18, y: pumpCy },
+        { x: pumpCx - 46, y: pumpCy }
+      ], COLORS.permeate, 'flow-fast', true);
+      
+      // Line out of discharge (top)
+      fullMarkup += streamPath([
+        { x: pumpCx, y: centerY },
+        { x: feedInXPass, y: centerY }
+      ], COLORS.permeate, 'flow-fast');
+      
+      // Add pump to pumps layer so it draws on top of the line
+      pumpsMarkup += pumpIcon(pumpCx, pumpCy, 1, 'INTERPASS PUMP');
+      
+      x = newX; // Reposition starting x for Pass 2
     }
+  });
+
+  // FINAL OUTLETS: SYSTEM PERMEATE & CONCENTRATE
+  const last = passExits[passExits.length - 1];
+  
+  // 1. Draw final permeate stream outlet with marker
+  fullMarkup += streamPath([{ x: last.permeateX, y: last.permeateY }, { x: last.permeateX + GEO.outletStub, y: last.permeateY }], COLORS.permeate);
+  // Arrow head marker
+  fullMarkup += `<line x1="${last.permeateX + GEO.outletStub - 6}" y1="${last.permeateY}" x2="${last.permeateX + GEO.outletStub}" y2="${last.permeateY}" stroke="${COLORS.permeate}" stroke-width="2.6" marker-end="url(#pfd-ah-permeate)" />`;
+  fullMarkup += `<text x="${last.permeateX + GEO.outletStub + 12}" y="${last.permeateY + 4}" font-size="13" font-weight="800" fill="${COLORS.permeate}" font-family="Outfit, sans-serif">PERMEATE</text>`;
+  
+  if (state.calc.showFlows) {
+    const finalPerm = passExits.length > 1 ? passFlows[1].permeate : passFlows[0].permeate;
+    fullMarkup += `<text x="${last.permeateX + 6}" y="${last.permeateY - 8}" font-size="10" font-weight="700" fill="${COLORS.permeate}" font-family="Fira Code, monospace">${finalPerm.toFixed(1)} m³/h</text>`;
+  }
+
+  // 2. Draw final concentrate collection manifold and outlet
+  const finalManifoldY = Math.max(...passExits.map(p => p.concentrateY)) + 50; // drop down more to give space
+  
+  const hasRecycle = state.passes.length >= 2;
+  const recyclePass = 1; // Pass 2
+
+  passExits.forEach((p, idx) => {
+    // Drop down each pass concentrate to final bottom header
+    fullMarkup += streamPath([
+      { x: p.concentrateX, y: p.concentrateY },
+      { x: p.concentrateX, y: finalManifoldY }
+    ], COLORS.concentrate);
     
-    const rejectTextX = recycleEnabled ? (cX + 75) : (cX + 48);
-    s += txt(rejectTextX, p1CY+16, hasPass2 ? 'Pass 1 Reject' : 'Reject Stream', 'middle', '#ef4444', 9.5, 'bold');
-    if (netRejectFlow > 0) {
-        s += txt(rejectTextX, p1CY+28, `${netRejectFlow.toFixed(1)} m³/h`, 'middle', '#ef4444', 9.5, 'bold');
+    // Add flow node labels for individual pass concentrate
+    if (state.calc.showFlows) {
+      fullMarkup += `<text x="${p.concentrateX + 4}" y="${(p.concentrateY + finalManifoldY) / 2}" font-size="8.5" font-weight="500" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">${passFlows[idx].concentrate.toFixed(1)}</text>`;
     }
+  });
 
-    if (recycleEnabled) {
-        s += `<circle cx="${cX+45}" cy="${p1CY}" r="4.5" fill="#ef4444"/>`;
+  // Connect bottom header horizontally
+  const firstConcX = passExits[0].concentrateX;
+  const lastConcX = passExits[passExits.length - 1].concentrateX;
+  if (passExits.length > 1) {
+    fullMarkup += streamPath([{ x: firstConcX, y: finalManifoldY }, { x: lastConcX, y: finalManifoldY }], COLORS.concentrate);
+  }
+  
+  // Final outlet
+  fullMarkup += streamPath([{ x: lastConcX, y: finalManifoldY }, { x: lastConcX + GEO.outletStub, y: finalManifoldY }], COLORS.concentrate);
+  
+  // Recycle loop drawing (Partial recycle from Pass 2)
+  if (hasRecycle) {
+    const p = passExits[recyclePass];
+    const branchY = p.concentrateY + 14; // Branch off cleanly above the flow text
+    const recycleDropX = p.concentrateX - 40; // Drop down on the LEFT side, between the passes
+    const recycleY = finalManifoldY + 40;
+    const startMixCx = 60 - 10; // Derived from x=60 initial value
+    const startMixCy = centerY + 13;
+    
+    fullMarkup += streamPath([
+      { x: p.concentrateX, y: branchY },
+      { x: recycleDropX, y: branchY },
+      { x: recycleDropX, y: recycleY },
+      { x: startMixCx, y: recycleY },
+      { x: startMixCx, y: startMixCy + 10 }
+    ], COLORS.concentrate, 'flow-fast', true);
+    
+    if (state.calc.showFlows) {
+      fullMarkup += `<text x="${startMixCx + 8}" y="${recycleY - 6}" font-size="8.5" font-weight="500" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">Pass ${recyclePass + 1} Recycle (Partial)</text>`;
     }
+  }
 
-    s += tankSym(cX+130, p1CY, hasPass2 ? 'Pass 1 Reject' : 'Reject Tank', 'var(--rej-tank-bg)', 'var(--rej-tank-stroke)', 'var(--rej-tank-text)');
+  // Arrow head marker
+  fullMarkup += `<line x1="${lastConcX + GEO.outletStub - 6}" y1="${finalManifoldY}" x2="${lastConcX + GEO.outletStub}" y2="${finalManifoldY}" stroke="${COLORS.concentrate}" stroke-width="2.6" marker-end="url(#pfd-ah-concentrate)" />`;
+  fullMarkup += `<text x="${lastConcX + GEO.outletStub + 12}" y="${finalManifoldY + 4}" font-size="13" font-weight="800" fill="${COLORS.concentrate}" font-family="Outfit, sans-serif">CONCENTRATE</text>`;
+  
+  if (state.calc.showFlows) {
+    const finalConc = Q_f - (passExits.length > 1 ? passFlows[1].permeate : passFlows[0].permeate);
+    fullMarkup += `<text x="${lastConcX + 6}" y="${finalManifoldY + 16}" font-size="10" font-weight="700" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">${finalConc.toFixed(1)} m³/h</text>`;
+  }
 
-    // Concentrate Recycle Loop drawing
-    if (recycleEnabled) {
-        const rX = cX + 45;
-        const jX = 100;
-        const loopY = 95;
-        
-        // 1. Draw vertical line up from reject line
-        s += line(rX, p1CY, rX, loopY, '#f59e0b', 2.5);
-        // 2. Draw horizontal line to the left
-        s += line(rX, loopY, jX, loopY, '#f59e0b', 2.5);
-        // 3. Draw vertical line down to feed line
-        s += line(jX, loopY, jX, p1CY, '#f59e0b', 2.5);
-        // 4. Draw arrowhead at the merge junction
-        s += `<polygon points="${jX-3.5},${p1CY-6} ${jX+3.5},${p1CY-6} ${jX},${p1CY}" fill="#f59e0b"/>`;
-        
-        // 5. Labels on the recycle line
-        const midX = (jX + rX) / 2;
-        s += txt(midX, 88, 'Concentrate Recycle', 'middle', '#f59e0b', 9, 'bold');
-        s += txt(midX, 108, flowText, 'middle', 'var(--text-secondary)', 8.5, 'bold');
-        
-        // 6. Draw Blended Feed flow rate after junction
-        const blendFlow = (window.lastCalcResult && window.lastCalcResult.recycle && window.lastCalcResult.recycle.enabled) 
-            ? window.lastCalcResult.recycle.blended_feed_flow_m3h 
-            : (displayFeedFlow + (recycleFlow || 0));
-        
-        if (blendFlow > 0) {
-            s += txt((hpX + N.PR + p1[0].fhX) / 2, p1CY - 8, `${blendFlow.toFixed(1)} m³/h`, 'middle', '#3b82f6', 8.5, 'bold');
-            s += txt((hpX + N.PR + p1[0].fhX) / 2, p1CY + 14, 'Blended Feed', 'middle', 'var(--text-secondary)', 8, 'italic');
-        }
-    }
+  // Update bounds for viewBox sizing
+  sysMaxBottom = Math.max(sysMaxBottom, hasRecycle ? finalManifoldY + 60 : finalManifoldY + 40);
+  sysMaxTop = Math.min(sysMaxTop, last.permeateY - 40);
 
-    const svgOut = `<svg id="pfd-svg" viewBox="0 0 ${rEdge} ${bEdge}" width="100%" style="min-width: ${rEdge}px; max-width: 100%; border-radius: 8px;" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  const totalWidth = Math.max(last.permeateX, lastConcX) + GEO.outletStub + 150;
+  const viewMinY = sysMaxTop - 30;
+  const viewHeight = (sysMaxBottom + 30) - viewMinY;
+
+  const svgOpening = `<svg id="pfdSvg" xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${viewHeight}" viewBox="0 ${viewMinY} ${totalWidth} ${viewHeight}" style="background-color: transparent;">`;
+  
+  return svgOpening + arrowMarkerDefs + fullMarkup + pumpsMarkup + `</svg>`;
+}
+
+    const svgContent = buildSVG();
     const containers = document.querySelectorAll('#pfd-svg-container');
-    containers.forEach(function(c) {
-        c.innerHTML = svgOut;
+    containers.forEach(c => {
+        c.innerHTML = svgContent;
+        c.style.background = 'var(--card-bg)';
+        c.style.boxShadow = '0 2px 12px rgba(0,0,0,0.09)';
     });
 };
 
 // --- Make PFD Dynamic Based on User Inputs ---
 window.updateLivePFD = function() {
     if (typeof window.drawPFDSVG === 'function') {
-        const p1ArrText = document.getElementById('calc-vessels-array').value || '4,2';
-        const p1Arr = p1ArrText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+        const p1ArrText = document.getElementById('calc-vessels-array').value;
+        const p1Arr = p1ArrText ? p1ArrText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0) : [];
         const nEl = parseInt(document.getElementById('calc-elements-pv').value) || 6;
         const ro_results = window.lastCalcResult ? window.lastCalcResult.ro_results : null;
         
-        // Only draw if we have a valid array
-        if (p1Arr.length > 0) {
-            window.drawPFDSVG(ro_results, p1Arr, nEl);
-        }
+        window.drawPFDSVG(ro_results, p1Arr, nEl);
     }
 };
 
@@ -5420,9 +5675,22 @@ window.renderPhysicsResults = function(data) {
 };
 
 window.renderPhysicsCharts = function(snapshots) {
-    const labels = snapshots.map(s => `Year ${s.year}`);
-    const npfData = snapshots.map(s => s.npf);
-    const nspData = snapshots.map(s => s.nsp);
+    const chartSnaps = [];
+    snapshots.forEach((s, i) => {
+        chartSnaps.push({ label: s.year === 0 ? 'Baseline' : `Year ${s.year}`, snap: s });
+        // If a replacement happened this year, explicitly inject the clean baseline 
+        // immediately after the fouled state so the chart visually drops back down.
+        if (s.replacement_triggered && i > 0) {
+            chartSnaps.push({
+                label: `Yr ${s.year} (New)`,
+                snap: { ...snapshots[0], year: s.year } 
+            });
+        }
+    });
+
+    const labels = chartSnaps.map(cs => cs.label);
+    const npfData = chartSnaps.map(cs => cs.snap.npf);
+    const nspData = chartSnaps.map(cs => cs.snap.nsp);
     
     // 1. NPF & NSP Chart
     const ctxNpf = document.getElementById('phys-npf-chart');
@@ -5488,10 +5756,10 @@ window.renderPhysicsCharts = function(snapshots) {
     // 2. Fouling Mechanism Chart
     const ctxFouling = document.getElementById('phys-fouling-chart');
     if (ctxFouling) {
-        const rcData = snapshots.map(s => s.rc_avg || 0);
-        const rbData = snapshots.map(s => s.rb_avg || 0);
-        const rnData = snapshots.map(s => s.rn_avg || 0);
-        const rsData = snapshots.map(s => s.rs_avg || 0);
+        const rcData = chartSnaps.map(cs => cs.snap.rc_avg || 0);
+        const rbData = chartSnaps.map(cs => cs.snap.rb_avg || 0);
+        const rnData = chartSnaps.map(cs => cs.snap.rn_avg || 0);
+        const rsData = chartSnaps.map(cs => cs.snap.rs_avg || 0);
         
         if (window.physFoulingChartInstance) window.physFoulingChartInstance.destroy();
         window.physFoulingChartInstance = new Chart(ctxFouling, {
@@ -5543,8 +5811,8 @@ window.renderPhysicsCharts = function(snapshots) {
     // 3. Feed Pressure & SEC Trend Chart
     const ctxPressure = document.getElementById('phys-pressure-chart');
     if (ctxPressure) {
-        const pressureData = snapshots.map(s => s.feed_pressure_bar || 0);
-        const secData = snapshots.map(s => s.sec_kwh_m3 || 0);
+        const pressureData = chartSnaps.map(cs => cs.snap.feed_pressure_bar || 0);
+        const secData = chartSnaps.map(cs => cs.snap.sec_kwh_m3 || 0);
         
         if (window.physPressureChartInstance) window.physPressureChartInstance.destroy();
         window.physPressureChartInstance = new Chart(ctxPressure, {

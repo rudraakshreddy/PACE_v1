@@ -1,0 +1,385 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>MembranePro - Scaling &amp; Fouling Analysis</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+        }
+        .compound-card:hover {
+            box-shadow: 0 0 20px rgba(50, 110, 245, 0.15);
+            border-color: #326ef5;
+        }
+        .chart-grid {
+            background-image: linear-gradient(to right, #e2e1ee 1px, transparent 1px),
+                              linear-gradient(to bottom, #e2e1ee 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .glow-hover:hover {
+            box-shadow: 0 0 15px 2px rgba(0, 81, 211, 0.2);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "outline": "#737686",
+                      "on-surface-variant": "#424655",
+                      "on-surface": "#191b24",
+                      "on-background": "#191b24",
+                      "primary-fixed": "#dbe1ff",
+                      "tertiary-fixed-dim": "#ffb695",
+                      "outline-variant": "#c3c6d7",
+                      "on-secondary": "#ffffff",
+                      "inverse-primary": "#b3c5ff",
+                      "primary-container": "#2e6bf2",
+                      "on-tertiary-fixed": "#351000",
+                      "on-tertiary-fixed-variant": "#7b2e00",
+                      "surface-bright": "#faf8ff",
+                      "primary": "#0051d3",
+                      "on-primary-fixed-variant": "#003ea6",
+                      "on-error-container": "#93000a",
+                      "on-error": "#ffffff",
+                      "surface-tint": "#0054d8",
+                      "surface-container-high": "#e7e7f4",
+                      "error-container": "#ffdad6",
+                      "on-primary": "#ffffff",
+                      "surface-container": "#ededf9",
+                      "inverse-surface": "#2e3039",
+                      "tertiary-container": "#c85209",
+                      "surface": "#faf8ff",
+                      "surface-container-highest": "#e2e1ee",
+                      "secondary-fixed-dim": "#b3c5ff",
+                      "on-tertiary-container": "#0e0200",
+                      "background": "#faf8ff",
+                      "surface-dim": "#d9d9e5",
+                      "secondary": "#495c94",
+                      "primary-fixed-dim": "#b3c5ff",
+                      "tertiary": "#a13f00",
+                      "secondary-fixed": "#dbe1ff",
+                      "error": "#ba1a1a",
+                      "inverse-on-surface": "#f0f0fc",
+                      "on-primary-fixed": "#00174a",
+                      "surface-variant": "#e2e1ee",
+                      "on-secondary-fixed": "#00174a",
+                      "surface-container-lowest": "#ffffff",
+                      "on-secondary-fixed-variant": "#31447b",
+                      "secondary-container": "#acbffe",
+                      "on-primary-container": "#fefcff",
+                      "surface-container-low": "#f3f2ff",
+                      "tertiary-fixed": "#ffdbcc",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-container": "#394c84"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "lg": "24px",
+                      "xl": "32px",
+                      "xs": "4px",
+                      "margin-desktop": "32px",
+                      "sm": "8px",
+                      "md": "16px",
+                      "margin-mobile": "16px",
+                      "gutter": "16px"
+              },
+              "fontFamily": {
+                      "headline-md": ["Inter"],
+                      "body-md": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "display-lg": ["Inter"],
+                      "headline-sm": ["Inter"],
+                      "label-sm": ["JetBrains Mono"],
+                      "label-md": ["JetBrains Mono"],
+                      "headline-lg": ["Inter"],
+                      "body-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-sm": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "label-sm": ["11px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "label-md": ["13px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.25", "fontWeight": "600"}],
+                      "body-sm": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex justify-between items-center px-margin-desktop w-full max-w-full backdrop-blur-md sticky top-0 z-50 bg-surface dark:bg-surface-dim h-16 border-b border-outline-variant dark:border-outline">
+<div class="flex items-center gap-xl">
+<span class="font-headline-sm text-headline-sm font-bold text-primary dark:text-primary-fixed-dim">MembranePro</span>
+<nav class="hidden md:flex gap-md h-full items-center font-body-md text-body-md">
+<a class="text-on-surface-variant dark:text-outline-variant pb-1 hover:text-primary transition-colors duration-200" href="#">File</a>
+<a class="text-on-surface-variant dark:text-outline-variant pb-1 hover:text-primary transition-colors duration-200" href="#">Feed Data</a>
+<a class="text-primary dark:text-primary-fixed-dim border-b-2 border-primary dark:border-primary-fixed-dim pb-1 font-bold" href="#">Scaling &amp; Fouling</a>
+<a class="text-on-surface-variant dark:text-outline-variant pb-1 hover:text-primary transition-colors duration-200" href="#">Process Rec</a>
+<a class="text-on-surface-variant dark:text-outline-variant pb-1 hover:text-primary transition-colors duration-200" href="#">Calculation</a>
+<a class="text-on-surface-variant dark:text-outline-variant pb-1 hover:text-primary transition-colors duration-200" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-primary transition-all">settings</span>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-primary transition-all">help</span>
+<div class="flex items-center gap-sm bg-surface-container rounded-full px-sm py-xs border border-outline-variant">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+<span class="text-label-md font-label-md">ENG_ADMIN</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-margin-desktop py-lg pb-24 overflow-y-auto">
+<!-- Header Title Section -->
+<div class="mb-lg">
+<div class="flex items-center gap-sm">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Scaling &amp; Fouling Analysis</h1>
+<span class="material-symbols-outlined text-secondary text-headline-sm">warning</span>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Review saturation indices and fouling risk across key scaling compounds.</p>
+</div>
+<!-- Layout Grid -->
+<div class="grid grid-cols-12 gap-lg">
+<!-- Left Column: Saturation Indices (60%) -->
+<section class="col-span-7 flex flex-col gap-md">
+<div class="bg-secondary-container rounded-t-lg px-md py-sm flex items-center gap-sm">
+<span class="material-symbols-outlined text-on-secondary-container">science</span>
+<h2 class="font-label-md text-label-md text-on-secondary-container tracking-wider uppercase">Saturation Indices (SI)</h2>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-b-lg p-md grid grid-cols-3 gap-md">
+<!-- High Risk Item -->
+<div class="compound-card bg-white border-2 border-error border-opacity-30 rounded-lg p-sm transition-all duration-300 relative overflow-hidden">
+<div class="flex justify-between items-start mb-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Iron (Fe(OH)₃)</span>
+<span class="material-symbols-outlined text-error text-body-sm">report</span>
+</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-error">1.067</span>
+<span class="font-label-md text-label-md text-error opacity-80">1168%</span>
+</div>
+<div class="w-full h-1 bg-surface-container mt-sm rounded-full overflow-hidden">
+<div class="bg-error h-full" style="width: 100%"></div>
+</div>
+</div>
+<!-- Moderate Risk Item -->
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="flex justify-between items-start mb-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Calcite (CaCO₃)</span>
+</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#F59E0B]">-0.077</span>
+<span class="font-label-md text-label-md text-[#F59E0B] opacity-80">84%</span>
+</div>
+<div class="w-full h-1 bg-surface-container mt-sm rounded-full overflow-hidden">
+<div class="bg-[#F59E0B] h-full" style="width: 84%"></div>
+</div>
+</div>
+<!-- Moderate Risk Item -->
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="flex justify-between items-start mb-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Barite (BaSO₄)</span>
+</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#F59E0B]">-0.131</span>
+<span class="font-label-md text-label-md text-[#F59E0B] opacity-80">74%</span>
+</div>
+<div class="w-full h-1 bg-surface-container mt-sm rounded-full overflow-hidden">
+<div class="bg-[#F59E0B] h-full" style="width: 74%"></div>
+</div>
+</div>
+<!-- Low Risk Grid (9 more items) -->
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Gypsum (CaSO₄·2H₂O)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-1.583</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">3%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Anhydrite (CaSO₄)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-1.886</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">1%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Fluorite (CaF₂)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-1.468</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">3%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Celestite (SrSO₄)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-1.722</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">2%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Silica (SiO₂)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-0.982</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">10%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Struvite (MgNH₄PO₄)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-2.450</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">0.4%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Strengite (FePO₄)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-1.112</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">7.7%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Hydroxylapatite</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-0.552</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">28%</span>
+</div>
+</div>
+<div class="compound-card bg-white border border-outline-variant rounded-lg p-sm transition-all duration-300">
+<div class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Aragonite (CaCO₃)</div>
+<div class="flex items-baseline gap-xs">
+<span class="font-headline-sm text-headline-sm text-[#16A34A]">-0.321</span>
+<span class="font-label-md text-label-md text-[#16A34A] opacity-80">47.8%</span>
+</div>
+</div>
+</div>
+<!-- Auxiliary Information Image (IMAGE_6 Context) -->
+<div class="mt-lg">
+<img class="w-full rounded-lg border border-outline-variant shadow-sm grayscale-[20%] opacity-80" data-alt="A clean, industrial dashboard showing technical data for membrane scaling. The image features high-resolution charts, chemical compound labels like Gypsum and Calcite, and a systematic technical grid. The lighting is bright and clean with a professional engineering aesthetic, dominated by white and shades of corporate blue and navy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiKMiPzyJSMH-og1BZ1twfpe_Qu0w8SQAYLB7oTXW9earK9-i3hDWMrcc8a8Jr99GtEvl4OLWFiqhbti3XRZiVsOqTKwQZcizuMD9f7rB5bYS1c37mES-ZWwQxBXLmCNDEeA--6iGS1RBQ0i1kJqjnxFyJnQSOFOcMUkSKYvguVaa4IYqEYU2FgO3hZCKP_DZC4FuAcsweHlPmL1cUfNKsPKCoNEhCXKQk7RyUtggEwxiFbDAP3d7mwuM9h3qKE3zCfS7AeZQpE10">
+</div>
+</section>
+<!-- Right Column: Saturation Visualization (40%) -->
+<section class="col-span-5 flex flex-col gap-md">
+<div class="bg-secondary-container rounded-t-lg px-md py-sm flex items-center gap-sm">
+<span class="material-symbols-outlined text-on-secondary-container">bar_chart</span>
+<h2 class="font-label-md text-label-md text-on-secondary-container tracking-wider uppercase">Saturation Visualization</h2>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-b-lg p-md flex flex-col gap-lg h-full">
+<!-- Legend -->
+<div class="flex items-center gap-md">
+<div class="flex items-center gap-xs">
+<div class="w-3 h-3 bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Safe Range</span>
+</div>
+<div class="flex items-center gap-xs">
+<div class="w-3 h-3 bg-error"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">High Risk (Outlier)</span>
+</div>
+<div class="ml-auto">
+<span class="font-label-sm text-label-sm italic text-outline">Unit: Saturation Index (log10)</span>
+</div>
+</div>
+<!-- Custom CSS Bar Chart -->
+<div class="flex-1 min-h-[400px] flex items-end justify-around border-l border-b border-outline-variant chart-grid p-sm relative">
+<!-- Y-Axis Labels -->
+<div class="absolute left-[-2.5rem] top-0 bottom-0 flex flex-col justify-between text-label-sm text-outline h-full py-sm">
+<span>2.0</span>
+<span>1.0</span>
+<span>0.0</span>
+<span>-1.0</span>
+<span>-2.0</span>
+<span>-3.0</span>
+</div>
+<!-- Bars -->
+<div class="w-8 bg-primary rounded-t-sm h-[30%] group relative cursor-help" title="Gypsum: -1.58">
+<div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-on-surface text-surface text-label-sm p-xs rounded shadow-lg z-10">-1.58</div>
+</div>
+<div class="w-8 bg-primary rounded-t-sm h-[25%] group relative cursor-help" title="Fluorite: -1.46"></div>
+<div class="w-8 bg-[#F59E0B] rounded-t-sm h-[48%] group relative cursor-help" title="Calcite: -0.07"></div>
+<div class="w-8 bg-error rounded-t-sm h-[85%] group relative cursor-help" title="Iron: 1.06">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 flex flex-col items-center">
+<span class="material-symbols-outlined text-error text-md">warning</span>
+<span class="font-label-sm text-error font-bold">1.06</span>
+</div>
+</div>
+<div class="w-8 bg-primary rounded-t-sm h-[45%] group relative cursor-help" title="Aragonite: -0.32"></div>
+<div class="w-8 bg-primary rounded-t-sm h-[20%] group relative cursor-help" title="Struvite: -2.45"></div>
+<div class="w-8 bg-primary rounded-t-sm h-[35%] group relative cursor-help" title="Silica: -0.98"></div>
+<div class="w-8 bg-primary rounded-t-sm h-[28%] group relative cursor-help" title="Celestite: -1.72"></div>
+</div>
+<!-- X-Axis Labels -->
+<div class="flex justify-around px-sm pt-xs">
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12">Gyp</span>
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12">Flu</span>
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12">Cal</span>
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12 font-bold text-error">Fe</span>
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12">Ara</span>
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12">Str</span>
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12">Sil</span>
+<span class="text-label-sm text-outline -rotate-45 origin-top-left truncate w-12">Cel</span>
+</div>
+<!-- CTA Section -->
+<div class="mt-xl pt-lg border-t border-outline-variant">
+<button class="w-full py-md bg-primary text-on-primary font-bold rounded-lg flex items-center justify-center gap-sm glow-hover transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span>
+                            RUN SCALING ANALYSIS
+                        </button>
+<p class="text-center font-label-sm text-on-surface-variant mt-sm">Last update: Today 09:42 AM</p>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer -->
+<footer class="fixed bottom-0 w-full h-12 bg-surface-container-low dark:bg-surface-container-high border-t border-outline-variant dark:border-outline flex justify-between items-center px-margin-desktop z-50">
+<div class="flex items-center gap-lg">
+<span class="font-label-sm text-label-sm text-on-surface">MembranePro v2.4 | Status: Ready</span>
+<div class="flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+<span class="text-label-sm text-outline font-medium">Calculation Engine: Active</span>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="text-secondary dark:text-secondary-fixed-dim font-label-md text-label-md px-sm py-1 hover:bg-primary-container hover:text-on-primary-container transition-all rounded">Save Project</button>
+<button class="text-secondary dark:text-secondary-fixed-dim font-label-md text-label-md px-sm py-1 hover:bg-primary-container hover:text-on-primary-container transition-all rounded">Load Project</button>
+<button class="text-secondary dark:text-secondary-fixed-dim font-label-md text-label-md px-sm py-1 hover:bg-primary-container hover:text-on-primary-container transition-all rounded">Reset All</button>
+</div>
+</footer>
+<script>
+        // Micro-interactions for industrial dashboard feel
+        document.querySelectorAll('.compound-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-2px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Simulating data updates for atmospheric effect
+        setInterval(() => {
+            const labels = document.querySelectorAll('.font-label-sm');
+            const randomIdx = Math.floor(Math.random() * labels.length);
+            // Subtle flash effect on random data point occasionally
+        }, 5000);
+    </script>
+</body></html>

@@ -1,0 +1,460 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Project Information | MembranePro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-container": "#0e0200",
+                        "surface-bright": "#faf8ff",
+                        "tertiary-container": "#c85209",
+                        "tertiary-fixed": "#ffdbcc",
+                        "on-secondary": "#ffffff",
+                        "on-primary-container": "#fefcff",
+                        "inverse-surface": "#2e3039",
+                        "inverse-primary": "#b3c5ff",
+                        "surface-container-high": "#e7e7f4",
+                        "surface-container-low": "#f3f2ff",
+                        "secondary-fixed": "#dbe1ff",
+                        "primary": "#0051d3",
+                        "on-error-container": "#93000a",
+                        "outline": "#737686",
+                        "on-secondary-fixed": "#00174a",
+                        "on-tertiary-fixed": "#351000",
+                        "on-surface-variant": "#424655",
+                        "on-background": "#191b24",
+                        "on-surface": "#191b24",
+                        "surface-variant": "#e2e1ee",
+                        "on-primary-fixed": "#00174a",
+                        "primary-fixed": "#dbe1ff",
+                        "primary-container": "#2e6bf2",
+                        "secondary-container": "#acbffe",
+                        "surface": "#faf8ff",
+                        "error-container": "#ffdad6",
+                        "surface-container-highest": "#e2e1ee",
+                        "on-secondary-fixed-variant": "#31447b",
+                        "on-secondary-container": "#394c84",
+                        "inverse-on-surface": "#f0f0fc",
+                        "secondary-fixed-dim": "#b3c5ff",
+                        "primary-fixed-dim": "#b3c5ff",
+                        "on-primary-fixed-variant": "#003ea6",
+                        "on-tertiary-fixed-variant": "#7b2e00",
+                        "secondary": "#495c94",
+                        "tertiary": "#a13f00",
+                        "surface-container": "#ededf9",
+                        "error": "#ba1a1a",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb695",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#c3c6d7",
+                        "background": "#faf8ff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-tint": "#0054d8",
+                        "surface-dim": "#d9d9e5",
+                        "read-only-fill": "#F3F5FB"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "gutter": "16px",
+                        "xl": "32px",
+                        "sm": "8px",
+                        "md": "16px",
+                        "margin-desktop": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-md": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-sm": ["JetBrains Mono"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "body-sm": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                        "label-md": ["13px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-sm": ["11px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 1.25rem;
+        }
+        .technical-card {
+            background: white;
+            border-radius: 0.25rem;
+            border: 1px solid theme('colors.outline-variant');
+            transition: all 0.2s ease-in-out;
+            overflow: hidden;
+        }
+        .technical-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 81, 211, 0.08);
+            border-color: theme('colors.primary');
+        }
+        .technical-card-header {
+            background: #192440; /* Technical Navy */
+            color: white;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 4px;
+            color: theme('colors.on-surface-variant');
+            font-family: theme('fontFamily.label-sm');
+            font-size: theme('fontSize.label-sm');
+            text-transform: uppercase;
+        }
+        .field-required::after {
+            content: '*';
+            color: theme('colors.error');
+            margin-left: 2px;
+        }
+        input, select, textarea {
+            width: 100%;
+            border: 1px solid theme('colors.outline-variant');
+            border-radius: 2px;
+            padding: 8px 12px;
+            font-family: theme('fontFamily.body-md');
+            font-size: theme('fontSize.body-md');
+            transition: all 0.15s ease;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: theme('colors.primary');
+            box-shadow: 0 0 0 2px rgba(0, 81, 211, 0.1);
+        }
+        input:read-only {
+            background-color: #F3F5FB;
+            color: theme('colors.on-surface-variant');
+            cursor: default;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: theme('colors.outline-variant'); border-radius: 10px; }
+        
+        /* Layout fixed-fluid hybrid */
+        body {
+            background-color: rgba(190, 210, 255, 0.76);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- TopNavBar (Shared Component) -->
+<header class="fixed top-0 left-0 w-full z-50 bg-white border-b border-outline-variant/30 h-12 px-margin-desktop flex items-center justify-between">
+  <div class="flex items-center gap-sm shrink-0">
+    <img alt="PERMIONICS" class="h-6 w-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAq7jhVj6qDur0WmeZP7Df9oPKINpR4steZ0AYGo_I-CehN1ghnC5mugyTJc5iOGAoYXkKn1odNO-EcMVGKyS4kefweIdfJxrSqNHyJ88-haygcyIXkq5GCLNb6-oM9wAhF1ldUQohUoVOA9n0RcXd_W9d-bFRqyfZyFKzvMYmyXu2VLWhqvg3QUm9EXHiYCjhYv0D15_yHlGFo8SomcFVMFovLI0J3A2wVt1ubxq2M7w9xnczsb7n7UsigtyY_ckE3Q2wOykeWGOezgw">
+    <span class="font-black text-[16px] text-[#191b24] ml-xs whitespace-nowrap">Projection Software</span>
+  </div>
+  <div class="flex items-center gap-md flex-grow justify-center px-xl">
+    <div class="relative w-full max-w-md">
+      <input class="bg-surface-container-low border-outline-variant rounded px-sm py-1 pl-8 text-on-surface placeholder-outline text-[12px] w-full focus:ring-2 focus:ring-primary-accent/20 outline-none text-[11px]" placeholder="Search..." type="text">
+      <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-outline text-[16px]">search</span>
+    </div>
+  </div>
+  <div class="flex items-center gap-md shrink-0">
+    <button class="bg-[#3D53D7] text-white rounded-[4px] py-1 px-3 font-semibold text-[13px] hover:brightness-110 transition-all whitespace-nowrap">Run Analysis</button>
+    <div class="flex items-center gap-xs">
+      <span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1">notifications</span>
+      <span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1">settings</span>
+      <div class="w-8 h-8 rounded-full bg-secondary-container overflow-hidden ml-xs">
+        
+      </div>
+    </div>
+  </div>
+</header>
+<!-- Sub-Header Navigation -->
+<div class="mt-12 bg-[#4884EB]/40 backdrop-blur-sm h-10 px-margin-desktop flex items-center gap-lg overflow-x-auto no-scrollbar">
+  <div class="flex items-center gap-xs px-3 h-8 rounded bg-white/30 text-[#000000] cursor-pointer whitespace-nowrap">
+    <span class="material-symbols-outlined text-[16px]">folder</span>
+    <span class="text-[11px] font-bold uppercase tracking-tight">File</span>
+    <span class="material-symbols-outlined text-[14px]">expand_more</span>
+  </div>
+  <a class="flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70 hover:text-black transition-colors whitespace-nowrap" href="#">
+    <span class="material-symbols-outlined text-[16px]">database</span>
+    <span class="text-[11px] font-bold uppercase tracking-tight">Feed Data</span>
+  </a>
+  <a class="flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70 hover:text-black transition-colors whitespace-nowrap" href="#">
+    <span class="material-symbols-outlined text-[16px] text-orange-500">warning</span>
+    <span class="text-[11px] font-bold uppercase tracking-tight">Scaling &amp; Fouling Analysis</span>
+  </a>
+  <a class="flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70 hover:text-black transition-colors whitespace-nowrap" href="#">
+    <span class="material-symbols-outlined text-[16px] text-purple-500">recommend</span>
+    <span class="text-[11px] font-bold uppercase tracking-tight">Process Recommendation</span>
+  </a>
+  <a class="flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70 hover:text-black transition-colors whitespace-nowrap" href="#">
+    <span class="material-symbols-outlined text-[16px] text-blue-500">calculate</span>
+    <span class="text-[11px] font-bold uppercase tracking-tight">Calculation</span>
+  </a>
+  <a class="flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70 hover:text-black transition-colors whitespace-nowrap" href="#">
+    <span class="material-symbols-outlined text-[16px] text-primary">hourglass_empty</span>
+    <span class="text-[11px] font-bold uppercase tracking-tight">Membrane Aging</span>
+  </a>
+  <a class="flex items-center gap-xs px-3 h-8 rounded text-[#000000]/70 hover:text-black transition-colors whitespace-nowrap" href="#">
+    <span class="material-symbols-outlined text-[16px] text-red-500">assessment</span>
+    <span class="text-[11px] font-bold uppercase tracking-tight">Report</span>
+  </a>
+</div>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-4 pb-xl px-margin-desktop space-y-lg max-w-[1440px] mx-auto w-full">
+<!-- Header Section -->
+<section class="flex justify-between items-start">
+<div>
+<h1 class="font-black text-primary-accent text-[28px] leading-tight tracking-tight">Project Information</h1>
+<p class="text-[12px] text-on-surface-variant -mt-1">Manage project identity, case revisions, and authorship details.</p>
+</div>
+<button class="border border-error text-error hover:bg-error/5 font-bold px-lg py-sm rounded-lg flex items-center gap-sm transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="delete_forever">delete_forever</span>
+                Delete Current Project
+            </button>
+</section>
+<!-- Grid Row 1 -->
+<div class="grid grid-cols-12 gap-lg">
+<!-- Project Identity -->
+<div class="col-span-7 technical-card">
+<div class="technical-card-header" style="background: linear-gradient(135deg, #3D53D7 0%, #28378d 100%); padding: 8px 12px;">
+<h2 class="text-[13px] font-bold text-on-primary">PROJECT IDENTITY</h2>
+</div>
+<div class="p-md space-y-md">
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Project Name</label>
+<div class="relative">
+<input class="pr-10 text-[11px]" placeholder="e.g. Coastal WTP - Phase 2" type="text">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline cursor-pointer hover:text-primary" data-icon="search">search</span>
+</div>
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Project ID</label>
+<input readonly="" type="text" value="PACE-2026-0614" class="text-[11px]">
+</div>
+<div class="grid grid-cols-2 gap-md">
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Company</label>
+<input placeholder="Client company" type="text" class="text-[11px]">
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Customer</label>
+<input placeholder="Customer name" type="text" class="text-[11px]">
+</div>
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Country</label>
+<select class="appearance-none bg-[url('https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/arrow_drop_down/default/24px.svg')] bg-no-repeat bg-[right_8px_center] text-[11px]">
+<option value="">Select Country / Region</option>
+<option value="usa">United States</option>
+<option value="ind">India</option>
+<option value="ger">Germany</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Personnel -->
+<div class="col-span-5 technical-card">
+<div class="technical-card-header" style="background: linear-gradient(135deg, #3D53D7 0%, #28378d 100%); padding: 8px 12px;">
+<h2 class="text-[13px] font-bold text-on-primary">PERSONNEL</h2>
+</div>
+<div class="p-md space-y-md">
+<div class="grid grid-cols-2 gap-md">
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Engineer / Prepared By</label>
+<input type="text" value="BHAVANI" class="text-[11px]">
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Username</label>
+<input readonly="" type="text" value="BHAVANI\\bhava" class="text-[11px]">
+</div>
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Prepared For</label>
+<textarea class="resize-none text-[11px]" placeholder="Recipient / plant contact details..." rows="4"></textarea>
+</div>
+</div>
+</div>
+</div>
+<!-- Grid Row 2 -->
+<div class="grid grid-cols-12 gap-lg">
+<!-- Case & Revision -->
+<div class="col-span-7 technical-card">
+<div class="technical-card-header" style="background: linear-gradient(135deg, #3D53D7 0%, #28378d 100%); padding: 8px 12px;">
+<h2 class="text-[13px] font-bold text-on-primary">CASE &amp; REVISION</h2>
+</div>
+<div class="p-md space-y-md">
+<div class="flex items-end gap-md">
+<div class="input-group flex-grow">
+<label class="text-[10px] font-semibold text-on-surface-variant">Case Number</label>
+<select class="text-[11px]">
+<option>1</option>
+<option>2</option>
+</select>
+</div>
+<button class="h-10 px-lg border border-outline text-on-surface-variant font-bold hover:bg-surface-container-low transition-all rounded flex items-center gap-xs">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                            New Case
+                        </button>
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Case Description</label>
+<input type="text" value="New Case" class="text-[11px]">
+</div>
+<div class="flex items-end gap-md">
+<div class="input-group flex-grow">
+<label class="text-[10px] font-semibold text-on-surface-variant">Revision</label>
+<select class="text-[11px]">
+<option>0</option>
+<option>1</option>
+</select>
+</div>
+<button class="h-10 px-lg border border-error/50 text-error font-bold hover:bg-error/5 transition-all rounded flex items-center gap-xs">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+                            Delete Revision
+                        </button>
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Revision Description</label>
+<input type="text" value="Initial Design Review" class="text-[11px]">
+</div>
+</div>
+</div>
+<!-- Dates & Version -->
+<div class="col-span-5 technical-card">
+<div class="technical-card-header" style="background: linear-gradient(135deg, #3D53D7 0%, #28378d 100%); padding: 8px 12px;">
+<h2 class="text-[13px] font-bold text-on-primary">DATES &amp; VERSION</h2>
+</div>
+<div class="p-md space-y-md">
+<div class="grid grid-cols-2 gap-md">
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Date Created</label>
+<input readonly="" type="text" value="14 Jun 2026" class="text-[11px]">
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Date Last Revised</label>
+<input readonly="" type="text" value="29 Jun 2026" class="text-[11px]">
+</div>
+</div>
+<div class="grid grid-cols-2 gap-md">
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Run Date</label>
+<input type="date" value="2026-06-29" class="text-[11px]">
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">PACE Version</label>
+<input readonly="" type="text" value="v4.2 PRO" class="text-[11px]">
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Grid Row 3 -->
+<div class="technical-card">
+<div class="technical-card-header" style="background: linear-gradient(135deg, #3D53D7 0%, #28378d 100%); padding: 8px 12px;">
+<h2 class="text-[13px] font-bold text-on-primary">NOTES &amp; DOCUMENTATION</h2>
+</div>
+<div class="p-md space-y-md">
+<div class="grid grid-cols-2 gap-md">
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Project Notes</label>
+<textarea placeholder="General notes about this project..." rows="4" class="text-[11px]"></textarea>
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Case Notes</label>
+<textarea placeholder="Notes specific to this case..." rows="4" class="text-[11px]"></textarea>
+</div>
+</div>
+<div class="input-group">
+<label class="text-[10px] font-semibold text-on-surface-variant">Keywords</label>
+<input placeholder="e.g. brackish, BWRO, coastal, phase-2" type="text" class="text-[11px]">
+</div>
+</div>
+</div>
+</main>
+<!-- Footer (Shared Component) -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex justify-between items-center px-margin-desktop py-sm bg-surface-container-lowest border-t border-outline-variant">
+<div class="flex items-center gap-md">
+<div class="flex items-center gap-sm">
+<span class="text-[11px] font-black uppercase tracking-widest text-on-surface"></span>
+<span class="text-[11px] font-black uppercase tracking-widest text-on-surface">Project Status: <span class="font-bold">Draft</span> | Last Saved: <span class="italic">Not yet saved</span></span>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="border border-outline text-on-surface-variant font-bold px-lg py-sm rounded-lg hover:bg-surface-container-low transition-all active:scale-95 text-[11px]">
+                Start New Project
+            </button>
+<button class="border border-outline text-on-surface-variant font-bold px-lg py-sm rounded-lg hover:bg-surface-container-low transition-all active:scale-95 text-[11px]">
+                Open Project
+            </button>
+<button class="border border-primary text-primary font-bold px-lg py-sm rounded-lg hover:bg-primary/5 transition-all active:scale-95 text-[11px]">
+                Save As New Revision
+            </button>
+<button class="bg-gradient-to-r from-primary to-primary-container text-white font-bold px-xl py-sm rounded-lg flex items-center gap-sm active:scale-95 transition-transform shadow-md text-[11px]">
+<span class="text-[11px] font-black uppercase tracking-widest text-on-surface" data-icon="save" style="font-variation-settings: &quot;FILL&quot; 1;">save</span>
+                Save
+            </button>
+</div>
+</footer>
+<script>
+        // Micro-interactions and focus handling
+        document.querySelectorAll('input, select, textarea').forEach(el => {
+            el.addEventListener('focus', () => {
+                // Potential for adding visual focus highlights on parent cards if needed
+            });
+        });
+
+        // Add a simple animation when buttons are clicked
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (this.textContent.trim() === "Save") {
+                    const originalContent = this.innerHTML;
+                    this.innerHTML = '<span class="material-symbols-outlined animate-spin" data-icon="progress_activity">progress_activity</span> Saving...';
+                    setTimeout(() => {
+                        this.innerHTML = '<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span> Saved';
+                        this.classList.replace('from-primary', 'from-green-600');
+                        this.classList.replace('to-primary-container', 'to-green-500');
+                        setTimeout(() => {
+                            this.innerHTML = originalContent;
+                            this.classList.replace('from-green-600', 'from-primary');
+                            this.classList.replace('to-green-500', 'to-primary-container');
+                        }, 2000);
+                    }, 800);
+                }
+            });
+        });
+    </script>
+
+
+
+
+</body></html>

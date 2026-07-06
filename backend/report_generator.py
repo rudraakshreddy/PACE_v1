@@ -447,7 +447,7 @@ def _add_footer(doc, proj_name, date_str):
 
 class ReportGenerator:
     def __init__(self):
-        self.today = datetime.now().strftime('%m/%d/%Y')
+        self.today = datetime.now().strftime('%d/%m/%Y')
 
     def _chart_pfd_diagram(self, ro_results, sr):
         if not ro_results:
@@ -697,28 +697,19 @@ class ReportGenerator:
         # ── Project Information Table ──
         if pd:
             _heading(doc, 'Project Information', size=11)
+            
+            # Combine names if present
+            full_name = f"{pd.get('firstName', '')} {pd.get('lastName', '')}".strip()
+            
             pd_rows = [
-                ['Project Name', pd.get('name') or '—'],
+                ['Project Name', proj_name],
+                ['Prepared By', full_name or '—'],
                 ['Company', pd.get('company') or '—'],
-                ['Customer', pd.get('customer') or '—'],
-                ['Country', pd.get('country') or '—'],
-                ['Client (Prepared For)', pd.get('client') or '—'],
-                ['Engineer', pd.get('engineer') or '—'],
-                ['Username', pd.get('username') or '—'],
-                ['Date', pd.get('date') or '—'],
+                ['Email', pd.get('email') or '—'],
+                ['Office', pd.get('office') or '—'],
+                ['Mobile', pd.get('mobile') or '—'],
+                ['Address', f"{pd.get('street', '')}, {pd.get('city', '')}, {pd.get('country', '')}".strip(", ") or '—'],
             ]
-            
-            rev_str = pd.get('revision', 'A')
-            if pd.get('revDesc'):
-                rev_str += f" ({pd.get('revDesc')})"
-            pd_rows.append(['Revision', rev_str])
-            
-            case_str = pd.get('caseNo', '1')
-            if pd.get('caseDesc'):
-                case_str += f" ({pd.get('caseDesc')})"
-            pd_rows.append(['Case Number', case_str])
-            
-            if pd.get('notes'): pd_rows.append(['Notes', pd.get('notes')])
             
             _prop_table(doc, pd_rows)
             _spacer(doc)
@@ -889,12 +880,9 @@ class ReportGenerator:
         self._footnote(doc)
         _spacer(doc, 4)
 
-        # Insert Stage Flow Bar Chart after Stage Table (we do this below element table for a unified charts section)
+        # (Stage Flow Bar Chart Removed as it's obvious from the table)
+        
         _heading(doc, 'Hydraulic Performance & Visualization')
-        buf_flow = _chart_bar_flow(stages)
-        _insert_chart(doc, buf_flow, width_in=5.5)
-        _spacer(doc, 4)
-
         buf_flux_ndp = _chart_dual_profile(elements, 'Flux & NDP Along Element Train', 'flux', 'ndp', 'Flux (LMH)', 'NDP (bar)')
         _insert_chart(doc, buf_flux_ndp, width_in=6.0)
         _spacer(doc, 4)
@@ -903,11 +891,8 @@ class ReportGenerator:
         buf_beta  = _chart_element_profile(elements, 'Concentration Polarization (β)', 'beta', 'β (–)', CHART_BLUE)
         _insert_two_charts(doc, buf_press, buf_beta, width_in=3.1)
         _spacer(doc, 4)
-
-        buf_tds = _chart_tds_profile(elements)
-        _insert_chart(doc, buf_tds, width_in=6.0)
-
-
+        
+        # (TDS Profile Chart Removed as it's obvious from the table)
     # ── Page 3: Ion analysis ──────────────────────────────────────────────
 
     def _page_ion_analysis(self, doc, ro_results, feed_water):
@@ -954,29 +939,8 @@ class ReportGenerator:
         self._footnote(doc)
         _spacer(doc, 4)
 
-        # Ion rejection bar chart
-        _heading(doc, '5 – Ion Rejection Bar Chart')
-        if active_ions:
-            ions_list = list(active_ions.keys())
-            rejs = [(1 - active_ions[i]['perm'] / active_ions[i]['feed']) * 100 for i in ions_list]
-            colors = [CHART_BRAND if r >= 99 else (CHART_BLUE if r >= 95 else CHART_ORANGE) for r in rejs]
-            fig, ax = plt.subplots(figsize=(6, max(2.5, len(ions_list) * 0.4)))
-            bars = ax.barh(ions_list, rejs, color=colors, alpha=0.85)
-            ax.set_xlim(0, 107)
-            ax.set_title('Ion Rejection (%)'); ax.set_xlabel('Rejection (%)')
-            for bar, rej in zip(bars, rejs):
-                ax.text(bar.get_width() + 0.3, bar.get_y() + bar.get_height() / 2,
-                        f'{rej:.2f}%', va='center', fontsize=7)
-            fig.tight_layout()
-            _insert_chart(doc, _chart_bytes(fig), width_in=6.0)
-        _spacer(doc, 4)
-
-        # Ion concentration comparison
-        _heading(doc, '6 – Ion Concentration Comparison: Feed vs Permeate vs Concentrate')
-        buf_ions = _chart_ion_bar_comparison(feed_water, perm_ions, conc_ions)
-        if buf_ions:
-            _insert_chart(doc, buf_ions, width_in=6.0)
-
+        # (Ion Rejection Bar Chart and Concentration Comparison Charts removed as they are obvious from the table)
+        
     # ── Page 5: Warnings ─────────────────────────────────────────────────────
 
     def _page_warnings(self, doc, ro_results, pass2_results=None):
@@ -1007,11 +971,41 @@ class ReportGenerator:
 
         _spacer(doc, 6)
         _heading(doc, 'RO Solubility Warnings')
-        sol_rows = [
-            ['Langelier Saturation Index > 0 – Anti-scalant may be required', '1'],
-            ['Consult anti-scalant manufacturer for dosing and maximum recovery', '1'],
-        ]
-        _data_table(doc, [['Warning', 'Pass No']], sol_rows, col_widths=[13.0, 1.5])
+        
+        from system_engine import _compute_nf_concentrate_scaling
+        sm = ro_results.get('summary', {})
+        conc_ions = sm.get('conc_ions', {})
+        feed_ph = ro_results.get('feed_ph', 7.0)
+        # Try to get temperature from feed data or ro_results; default to 25.0
+        temp_c = 25.0 # fallback
+        try:
+            if 'feed' in ro_results and 'temperature' in ro_results['feed']:
+                temp_c = float(ro_results['feed']['temperature'])
+        except:
+            pass
+            
+        sol_rows = []
+        try:
+            scaling = _compute_nf_concentrate_scaling(conc_ions, feed_ph, temp_c)
+            if scaling.get("CaCO3_calcite", {}).get("antiscalant_required"):
+                sol_rows.append(["Calcite saturation exceeded (LSI > 0) – Risk of carbonate scaling.", "Acid dosing or anti-scalant required."])
+            if scaling.get("CaSO4_gypsum", {}).get("antiscalant_required"):
+                sol_rows.append(["Gypsum saturation exceeded (SI > 0) – Risk of calcium sulfate scaling.", "Verify anti-scalant efficacy."])
+            if scaling.get("BaSO4_barite", {}).get("antiscalant_required"):
+                sol_rows.append(["Barite saturation exceeded (SI > 0) – High risk of barium sulfate scaling.", "Specialized anti-scalant required."])
+            if scaling.get("SrSO4_celestite", {}).get("antiscalant_required"):
+                sol_rows.append(["Celestite saturation exceeded (SI > 0) – Risk of strontium scaling.", "Use specialized anti-scalant."])
+            if scaling.get("CaF2_fluorite", {}).get("antiscalant_required"):
+                sol_rows.append(["Fluorite saturation exceeded (SI > 0) – Risk of calcium fluoride scaling.", "Use specialized anti-scalant."])
+            if scaling.get("SiO2", {}).get("antiscalant_required"):
+                sol_rows.append(["Amorphous Silica saturation > 80% – Risk of silica polymerization.", "Consider pH adjustment or silica-specific anti-scalant."])
+        except Exception:
+            pass
+
+        if not sol_rows:
+            sol_rows.append(["No critical solubility limits exceeded for major scalants.", "General anti-scalant recommended as best practice."])
+
+        _data_table(doc, [['Warning', 'Recommended Solution']], sol_rows, col_widths=[7.5, 7.0])
         _spacer(doc, 6)
 
         _heading(doc, 'RO Chemical Adjustments (Pass 1 Feed vs Concentrate)')
@@ -1157,11 +1151,7 @@ class ReportGenerator:
                                   selected_year: int = 0):
         """Generate the Physics-Based Multi-Year Performance Projection page."""
         _add_header_block(doc, proj_name)
-        _heading(doc, 'Physics-Based Multi-Year Membrane Performance Projection', size=13)
-        p = doc.add_paragraph()
-        _run(p, 'Algorithm: PACE-FEAT-MPP-002 Rev 2.0  |  ', size=8, italic=True, color=RGBColor(100,116,139))
-        _run(p, 'Mechanistic fouling sub-models + RK4 temporal integration + ASTM D4516-19a normalised metrics',
-             size=8, italic=True, color=RGBColor(100,116,139))
+        _heading(doc, 'Year-Wise Performance', size=13)
         _spacer(doc, 6)
 
         snapshots = physics.get('annual_snapshots', [])
@@ -1299,17 +1289,6 @@ class ReportGenerator:
         )
         _spacer(doc, 8)
 
-        # ── CIP Events ────────────────────────────────────────────────────────
-        cip_events = physics.get('cip_events', [])
-        if cip_events:
-            _heading(doc, 'CIP Events Log', size=11)
-            cip_rows = [[str(yr), cip_type] for yr, cip_type in cip_events]
-            _data_table(doc,
-                [['Year', 'CIP Protocol']],
-                cip_rows,
-                col_widths=[4.0, 10.5]
-            )
-            _spacer(doc, 6)
 
         # ── Charts ────────────────────────────────────────────────────────────
         _heading(doc, 'Performance Trend Charts', size=11)
