@@ -5340,7 +5340,7 @@ window.renderPhysicsResults = function(data) {
                     <td>${s.perm_flow.toFixed(2)}</td>
                     <td>${(s.recovery * 100).toFixed(1)}%</td>
                     <td>${s.feed_pressure_bar.toFixed(1)}</td>
-                    <td>${s.dp_bar !== undefined ? s.dp_bar.toFixed(1) : '-'}</td>
+                    <td>${s.tmp_bar !== undefined ? s.tmp_bar.toFixed(1) : '-'}</td>
                     <td>${s.perm_tds.toFixed(1)}</td>
                     <td>${s.sec_kwh_m3.toFixed(2)}</td>
                     <td>${s.npf.toFixed(4)}</td>

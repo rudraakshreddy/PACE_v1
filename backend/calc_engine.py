@@ -631,6 +631,7 @@ class ROEngine:
         # Calculate total differential pressure across the system
         total_boost_dp = sum(b.get("boost_dp_bar", 0.0) for b in system_results.get("booster_pumps", []))
         total_dp_bar = feed_pressure_bar - stage_exit_pressure + total_boost_dp
+        total_tmp_bar = feed_pressure_bar - (total_dp_bar / 2.0)
 
         system_results["summary"] = {
             "total_recovery": system_recovery,
@@ -640,6 +641,7 @@ class ROEngine:
             "avg_flux_lmh": avg_flux,
             "feed_pressure_bar": feed_pressure_bar,
             "total_dp_bar": round(total_dp_bar, 2),
+            "total_tmp_bar": round(total_tmp_bar, 2),
             "hp_pump_power_kw": round(hp_pump_power_kw, 2),
             "booster_pump_power_kw": round(total_booster_power_kw, 2),
             "total_power_kw": round(total_power_kw, 2),

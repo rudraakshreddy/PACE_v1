@@ -427,6 +427,7 @@ class PhysicsAgingEngine:
             "recovery":             bsum["total_recovery"],
             "feed_pressure_bar":    bsum["feed_pressure_bar"],
             "dp_bar":               bsum.get("total_dp_bar", 0.0),
+            "tmp_bar":              bsum.get("total_tmp_bar", 0.0),
             "perm_tds":             bsum["perm_tds"],
             "sec_kwh_m3":           bsum["sec_kwh_m3"],
             "npf":                  1.0,
@@ -548,6 +549,8 @@ class PhysicsAgingEngine:
             "nom_adsorption": 0.0,
         }
 
+        membrane_age_months = 0
+
         # Year-loop
         for year in range(1, n_years + 1):
             # ---- Monthly time-stepping within the year ----------------
@@ -572,6 +575,7 @@ class PhysicsAgingEngine:
             q_nom_avg  = [[0.0]*NZ for _ in range(n_total_elem)]
 
             for month in range(months_per_year):
+                membrane_age_months += 1
                 # ---------------------------------------------------------
                 # 1. Spatial transport at frozen fouling state
                 #    Estimate local Jw, kM, tau_w per segment per element
@@ -713,7 +717,7 @@ class PhysicsAgingEngine:
                         cip_count_total += 1
                         cip_events.append((year, elapsed_months, "Scheduled"))
                         mc, Lb, delta_s, q_nom = self._apply_cip(
-                            mc, Lb, delta_s, q_nom, temp_c, n_total_elem, elapsed_months
+                            mc, Lb, delta_s, q_nom, temp_c, n_total_elem, membrane_age_months
                         )
                         for ei in range(n_total_elem):
                             for zi in range(NZ):
@@ -781,7 +785,7 @@ class PhysicsAgingEngine:
                     cip_count_total += 1
                     cip_events.append((year, elapsed_deferred, "Scheduled [post-snap]"))
                     mc, Lb, delta_s, q_nom = self._apply_cip(
-                        mc, Lb, delta_s, q_nom, temp_c, n_total_elem, elapsed_deferred
+                        mc, Lb, delta_s, q_nom, temp_c, n_total_elem, membrane_age_months
                     )
                     for ei in range(n_total_elem):
                         for zi in range(NZ):
@@ -898,6 +902,7 @@ class PhysicsAgingEngine:
             if replace_triggered:
                 P_curr_bar = P0_bar
                 NPF_curr   = 1.0      # reset to baseline after replacement
+                membrane_age_months = 0
             else:
                 P_curr_bar = snap["feed_pressure_bar"]
                 NPF_curr   = snap["npf"]
@@ -1510,6 +1515,7 @@ class PhysicsAgingEngine:
         TDS_y  = s["perm_tds"]
         rec_y  = s["total_recovery"]
         DP_y   = s.get("total_dp_bar", 0.0)
+        TMP_y  = s.get("total_tmp_bar", 0.0)
 
         # SEC
         hp_eff = 0.80
@@ -1612,6 +1618,7 @@ class PhysicsAgingEngine:
             "recovery":             rec_y,
             "feed_pressure_bar":    Pfeed_y,
             "dp_bar":               DP_y,
+            "tmp_bar":              TMP_y,
             "perm_tds":             TDS_y,
             "sec_kwh_m3":           SEC_y,
             "npf":                  NPF,
@@ -1670,6 +1677,7 @@ class PhysicsAgingEngine:
             "recovery":             0.75 * degrade,
             "feed_pressure_bar":    P0_bar * (1.0 + FRI * 0.5),
             "dp_bar":               0.0,
+            "tmp_bar":              0.0,
             "perm_tds":             TDS0 * (1.0 + FRI * 0.3),
             "sec_kwh_m3":           SEC0 * (1.0 + FRI * 0.4),
             "npf":                  degrade,
