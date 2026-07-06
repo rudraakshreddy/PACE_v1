@@ -1920,9 +1920,7 @@ window.applyBestRecommendation = function() {
             }
         }
         
-        // Switch to calculation tab and overview
-        const calcTabBtn = document.getElementById('calculation-tab-btn');
-        if (calcTabBtn) calcTabBtn.click();
+        // Switch back to calculation overview subtab
         window.switchCalcSubTab('overview');
     }
 };
@@ -4016,7 +4014,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload.feed_quality = {
                         sdi15: safeVal('aging-sdi', 3.0),
                         toc_mg_l: safeVal('aging-toc', 2.0),
-                        cl2_residual_mg_l: safeVal('aging-cl2', 0.0)
+                        cl2_residual_mg_l: parseFloat(document.getElementById('cl2').value) || 0.0
                     };
                     payload.cip_config = {
                         interval_months: parseInt(safeVal('phys-cip-interval', 0)),
@@ -5342,13 +5340,13 @@ window.renderPhysicsResults = function(data) {
                     <td>${s.perm_flow.toFixed(2)}</td>
                     <td>${(s.recovery * 100).toFixed(1)}%</td>
                     <td>${s.feed_pressure_bar.toFixed(1)}</td>
+                    <td>${s.dp_bar !== undefined ? s.dp_bar.toFixed(1) : '-'}</td>
                     <td>${s.perm_tds.toFixed(1)}</td>
                     <td>${s.sec_kwh_m3.toFixed(2)}</td>
                     <td>${s.npf.toFixed(4)}</td>
                     <td>${s.nsp.toFixed(4)}</td>
                     <td>${s.fri.toFixed(3)}</td>
                     <td>${s.b_irr.toFixed(3)}</td>
-                    <td><span style="padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; background: var(--input-bg); color: var(--text-primary); text-transform: capitalize; border: 1px solid var(--input-border);">${s.dominant_mechanism.replace('_', ' ')}</span></td>
                     <td>${s.ndp_ratio.toFixed(3)}</td>
                 </tr>
             `;
@@ -5515,11 +5513,6 @@ window.renderPhysicsCharts = function(snapshots) {
                         label: 'NOM Adsorption',
                         data: rnData,
                         backgroundColor: '#3b82f6'
-                    },
-                    {
-                        label: 'Mineral Scaling',
-                        data: rsData,
-                        backgroundColor: '#fb923c'
                     }
                 ]
             },

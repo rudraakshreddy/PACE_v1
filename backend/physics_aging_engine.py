@@ -385,10 +385,22 @@ class PhysicsAgingEngine:
         if max_p_bar:
             self.p["Em"] = 1.0e8 * (max_p_bar / 41.4)
             
-        # 8.7: Chlorine-degradation rate
+        # 8.7: Chlorine-degradation rate (Sub-model VI)
         max_cl = op_limits.get("max_chlorine")
-        if max_cl is not None and max_cl > 0:
-            self.p["kB_chem"] = 0.03 * (0.1 / max_cl)
+        if max_cl is None or max_cl <= 0:
+            max_cl = 0.1
+            
+        actual_cl = fq.get("cl2_residual_mg_l", 0.0)
+        
+        # Baseline chemical aging (e.g. hydrolysis) without chlorine
+        base_kB = 0.03 * (0.1 / max_cl)
+        
+        # Oxidative attack from free chlorine
+        # Continuous exposure of max_cl (typically 0.1 ppm) gives ~1.0/yr degradation rate (~1000 ppm-h life)
+        cl_kB = actual_cl * (1.0 / max_cl)
+        
+        self.p["kB_chem"] = base_kB + cl_kB
+        print(f"[DEBUG] max_cl={max_cl}, actual_cl={actual_cl}, base_kB={base_kB}, cl_kB={cl_kB}, total_kB_chem={self.p['kB_chem']}")
 
         # 8.4 is handled during induction time logic (since it depends on dynamic wall SI)
 
@@ -414,6 +426,7 @@ class PhysicsAgingEngine:
             "perm_flow":            bsum["perm_flow"],
             "recovery":             bsum["total_recovery"],
             "feed_pressure_bar":    bsum["feed_pressure_bar"],
+            "dp_bar":               bsum.get("total_dp_bar", 0.0),
             "perm_tds":             bsum["perm_tds"],
             "sec_kwh_m3":           bsum["sec_kwh_m3"],
             "npf":                  1.0,
@@ -1496,6 +1509,7 @@ class PhysicsAgingEngine:
         Pfeed_y = s["feed_pressure_bar"]
         TDS_y  = s["perm_tds"]
         rec_y  = s["total_recovery"]
+        DP_y   = s.get("total_dp_bar", 0.0)
 
         # SEC
         hp_eff = 0.80
@@ -1597,6 +1611,7 @@ class PhysicsAgingEngine:
             "perm_flow":            Qp_y,
             "recovery":             rec_y,
             "feed_pressure_bar":    Pfeed_y,
+            "dp_bar":               DP_y,
             "perm_tds":             TDS_y,
             "sec_kwh_m3":           SEC_y,
             "npf":                  NPF,
@@ -1654,6 +1669,7 @@ class PhysicsAgingEngine:
             "perm_flow":            Q0 * degrade,
             "recovery":             0.75 * degrade,
             "feed_pressure_bar":    P0_bar * (1.0 + FRI * 0.5),
+            "dp_bar":               0.0,
             "perm_tds":             TDS0 * (1.0 + FRI * 0.3),
             "sec_kwh_m3":           SEC0 * (1.0 + FRI * 0.4),
             "npf":                  degrade,

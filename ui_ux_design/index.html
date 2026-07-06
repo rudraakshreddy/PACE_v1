@@ -87,9 +87,7 @@
             <button class="menu-btn pace-locked-tab" id="calculation-tab-btn" title="Complete Project Details first">
                 <i class="fa-solid fa-lock pace-lock-icon"></i> Calculation
             </button>
-            <button class="menu-btn pace-locked-tab" id="aging-tab-btn" title="Complete Project Details first">
-                <i class="fa-solid fa-lock pace-lock-icon"></i> Membrane Aging
-            </button>
+
             <button class="menu-btn pace-locked-tab" id="report-tab-btn" title="Complete Project Details first">
                 <i class="fa-solid fa-lock pace-lock-icon"></i> Report
             </button>
@@ -829,8 +827,6 @@
                             <select id="calc-tech-train">
                                 <option value="RO">RO Only</option>
                                 <option value="UF+RO">UF + RO</option>
-                                <option value="NF">NF Only</option>
-                                <option value="UF+NF">UF + NF</option>
                                 <option value="2P-RO">Two-Pass RO</option>
                                 <option value="UF+2P-RO">UF + Two-Pass RO</option>
                             </select>
@@ -1543,12 +1539,7 @@
                             <!-- Year Banner -->
                             <div id="phys-year-banner" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 10px; padding: 0.8rem 1.4rem; display: flex; align-items: center; justify-content: space-between;">
                                 <div>
-                                    <div style="font-size: 0.7rem; color: rgba(255,255,255,0.7); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700;">Physics-Based Membrane Performance</div>
                                     <div style="font-size: 1.5rem; font-weight: 800; color: white;" id="phys-banner-title">Year 0 — Baseline</div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-size: 0.7rem; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.06em;">Projection Mode</div>
-                                    <div style="font-size: 0.85rem; color: white; font-weight: 600;">5-Fouling-Mechanism Model</div>
                                 </div>
                             </div>
 
@@ -1619,13 +1610,13 @@
                                                 <th>Qp (m³/h)</th>
                                                 <th>Rec. (%)</th>
                                                 <th>P_feed (bar)</th>
+                                                <th>DP (bar)</th>
                                                 <th>TDS (mg/L)</th>
                                                 <th>SEC (kWh/m³)</th>
                                                 <th>NPF</th>
                                                 <th>NSP</th>
                                                 <th>FRI</th>
                                                 <th>B_rel</th>
-                                                <th title="The dominant fouling mechanism causing performance decline this year">Dominant Mech.</th>
                                                 <th title="Ratio of current Net Driving Pressure compared to clean baseline (NDP_y / NDP_0)">NDP Ratio</th>
                                             </tr>
                                         </thead>
@@ -1636,7 +1627,7 @@
                             </section>
 
                             <!-- Charts Row -->
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
                                 <!-- NPF/NSP Trend -->
                                 <section class="card">
                                     <div class="card-header">
@@ -1644,16 +1635,6 @@
                                     </div>
                                     <div style="padding: 0.5rem;">
                                         <canvas id="phys-npf-chart" height="180"></canvas>
-                                    </div>
-                                </section>
-
-                                <!-- Fouling Mechanism Chart -->
-                                <section class="card">
-                                    <div class="card-header">
-                                        <h2 class="card-title">Fouling Mechanisms</h2>
-                                    </div>
-                                    <div style="padding: 0.5rem;">
-                                        <canvas id="phys-fouling-chart" height="180"></canvas>
                                     </div>
                                 </section>
                             </div>
@@ -1694,9 +1675,6 @@
                                 <div class="card-header">
                                     <h2 class="card-title">Wall-Level Saturation Indices — <span id="phys-si-year-label">Year 0</span></h2>
                                 </div>
-                                <p style="font-size: 0.78rem; color: #64748b; margin: 0 1rem 0.5rem; padding: 0.4rem 0.8rem; background: rgba(99,102,241,0.05); border-radius: 5px; border-left: 3px solid #6366f1;">
-                                    Wall-SI includes concentration polarisation (CP) enhancement and is therefore higher than bulk concentrate SI. Year-on-year increase reflects reduced crossflow from fouling.
-                                </p>
                                 <div class="card-content" style="padding: 0;">
                                     <table class="report-table" style="width: 100%; border-collapse: collapse;">
                                         <thead>
@@ -1742,207 +1720,6 @@
                     </div>
                 </section>
             </main>
-        </div>
-
-        <div class="dashboard" id="aging-panel-view" style="display: none; grid-template-columns: 460px 1fr; gap: 0.6rem;">
-            <!-- Left Column: Aging Inputs -->
-            <main class="data-entry" style="display: flex; flex-direction: column; gap: 0.6rem; grid-column: span 1; overflow-y: auto; max-height: calc(100vh - 140px); padding-right: 0.3rem;">
-                <!-- System Configuration -->
-                <section class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">Aging Configuration</h2>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
-                        <div class="input-group">
-                            <label for="aging-design-life">Design Life (months)</label>
-                            <input type="number" id="aging-design-life" value="60" min="12" max="120" step="1">
-                        </div>
-                        <div class="input-group">
-                            <label for="aging-sim-mode">Simulation Mode</label>
-                            <select id="aging-sim-mode">
-                                <option value="constant_recovery" selected>Constant Recovery</option>
-                                <option value="constant_pressure">Constant Pressure</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label for="aging-cip-mode">CIP Mode</label>
-                            <select id="aging-cip-mode">
-                                <option value="scheduled" selected>Scheduled</option>
-                                <option value="performance">Performance-Triggered</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label for="aging-cip-interval-display">CIP Interval <span class="unit">months</span></label>
-                            <div style="display:flex; align-items:center; gap:0.5rem;">
-                                <input type="number" id="aging-cip-interval" value="0" min="0" max="60" step="1"
-                                    style="display:none;" aria-hidden="true">
-                                <input type="number" id="aging-cip-interval-display"
-                                    class="pace-synced-input"
-                                    min="0" max="60" step="1" value="0"
-                                    title="Shared with Year-wise Projection tab"
-                                    oninput="document.getElementById('phys-cip-interval').value=this.value; document.getElementById('aging-cip-interval').value=this.value*30;">
-                                <span class="pace-synced-text">↔ synced with Year-wise tab</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="padding: 0.4rem 0;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.82rem; color: var(--text-muted);">
-                            <input type="checkbox" id="aging-antiscalant" checked style="accent-color: var(--accent); width: 16px; height: 16px;" onchange="const dd = document.getElementById('phys-antiscalant'); if(dd) dd.value = this.checked ? 'true' : 'false';">
-                            Antiscalant Dosed
-                        </label>
-                    </div>
-                </section>
-
-                <!-- Feed Quality History -->
-                <section class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">Feed Quality History</h2>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                        <div class="input-group">
-                            <label for="aging-sdi"><span>SDI<sub>15</sub></span></label>
-                            <input type="number" id="aging-sdi" value="3.0" min="0.5" max="6.0" step="0.1">
-                        </div>
-                        <div class="input-group">
-                            <label for="aging-toc">TOC (mg/L)</label>
-                            <input type="number" id="aging-toc" value="2.0" min="0" max="20" step="0.1">
-                        </div>
-                        <div class="input-group">
-                            <label for="aging-temp">Temperature (°C)</label>
-                            <input type="number" id="aging-temp" value="28" min="5" max="45" step="1">
-                        </div>
-                        <div class="input-group">
-                            <label for="aging-cl2"><span>Free Cl<sub>2</sub> Post-SBS</span> <span class="unit">(mg/L)</span></label>
-                            <input type="number" id="aging-cl2" value="0.0" min="0" max="5" step="0.01">
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Run Button -->
-                <button class="btn" id="aging-run-btn" onclick="runAgingSimulation()" style="width: 100%; padding: 0.8rem; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.5px;">
-                    <i class="fa-solid fa-play"></i> Run Aging Simulation
-                </button>
-
-                <!-- End-of-Life Card -->
-                <section class="card" id="aging-eol-card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">End-of-Life Estimate</h2>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                        <div class="input-group" style="text-align: center;">
-                            <label style="font-size: 0.65rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted);">EOL Month</label>
-                            <div id="aging-eol-month" style="font-size: 1.3rem; font-weight: 700; color: var(--accent);">-</div>
-                        </div>
-                        <div class="input-group" style="text-align: center;">
-                            <label style="font-size: 0.65rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted);">Dominant Mechanism</label>
-                            <div id="aging-dominant-mech" style="font-size: 1.0rem; font-weight: 700; color: var(--warning);">-</div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Virtual Autopsy Table -->
-                <section class="card" id="aging-autopsy-card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">Virtual Membrane Autopsy</h2>
-                    </div>
-                    <div style="overflow-x: auto;">
-                        <table class="ion-table" id="aging-autopsy-table">
-                            <thead>
-                                <tr>
-                                    <th>Element</th>
-                                    <th>FRI Cake</th>
-                                    <th>FRI Bio</th>
-                                    <th>FRI NOM</th>
-                                    <th>FRI Scale</th>
-                                    <th>FRI Total</th>
-                                    <th>A_eff</th>
-                                </tr>
-                            </thead>
-                            <tbody id="aging-autopsy-tbody"></tbody>
-                        </table>
-                    </div>
-                </section>
-            </main>
-
-            <!-- Right Column: Results -->
-            <aside style="display: flex; flex-direction: column; gap: 0.6rem; overflow-y: auto; max-height: calc(100vh - 140px); padding-right: 0.3rem;">
-                <!-- Highlight Cards -->
-                <section class="card" id="aging-highlights-card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">Aging Summary</h2>
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
-                        <div class="cbe-display" style="text-align: center; padding: 0.6rem;">
-                            <div style="font-size: 0.6rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Final NPF</div>
-                            <div id="aging-hl-npf" style="font-size: 1.2rem; font-weight: 700; margin-top: 0.2rem;">-</div>
-                        </div>
-                        <div class="cbe-display" style="text-align: center; padding: 0.6rem;">
-                            <div style="font-size: 0.6rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Final P_feed</div>
-                            <div id="aging-hl-pfeed" style="font-size: 1.2rem; font-weight: 700; margin-top: 0.2rem;">-</div>
-                        </div>
-                        <div class="cbe-display" style="text-align: center; padding: 0.6rem;">
-                            <div style="font-size: 0.6rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">CIP Events</div>
-                            <div id="aging-hl-cips" style="font-size: 1.2rem; font-weight: 700; margin-top: 0.2rem;">-</div>
-                        </div>
-                        <div class="cbe-display" style="text-align: center; padding: 0.6rem;">
-                            <div style="font-size: 0.6rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">EOL Month</div>
-                            <div id="aging-hl-eol" style="font-size: 1.2rem; font-weight: 700; margin-top: 0.2rem;">-</div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Performance vs Age Chart -->
-                <section class="card" id="aging-chart-card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">Performance vs Age</h2>
-                    </div>
-                    <div id="aging-chart-container" style="position: relative; width: 100%; height: 340px;">
-                        <canvas id="aging-canvas-npf" style="width: 100%; height: 100%;"></canvas>
-                    </div>
-                </section>
-
-                <!-- FRI Heatmap -->
-                <section class="card" id="aging-heatmap-card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">FRI Heatmap (Final State)</h2>
-                    </div>
-                    <div id="aging-heatmap-container" style="overflow-x: auto;"></div>
-                </section>
-
-                <!-- Mechanism Breakdown -->
-                <section class="card" id="aging-mechanism-card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">Degradation Mechanism Breakdown</h2>
-                    </div>
-                    <div id="aging-mechanism-container" style="position: relative; width: 100%; height: 260px;">
-                        <canvas id="aging-canvas-mechanism" style="width: 100%; height: 100%;"></canvas>
-                    </div>
-                </section>
-
-                <!-- Monthly Data Table -->
-                <section class="card" id="aging-table-card" style="display: none;">
-                    <div class="card-header">
-                        <h2 class="card-title">Monthly Performance Data</h2>
-                    </div>
-                    <div style="overflow-x: auto; max-height: 300px; overflow-y: auto;">
-                        <table class="ion-table" id="aging-monthly-table">
-                            <thead>
-                                <tr>
-                                    <th>Month</th>
-                                    <th>P_feed (bar)</th>
-                                    <th>NPF</th>
-                                    <th>NSR</th>
-                                    <th>ΔP Ratio</th>
-                                    <th>Flux (LMH)</th>
-                                    <th>Recovery (%)</th>
-                                    <th>CIP?</th>
-                                </tr>
-                            </thead>
-                            <tbody id="aging-monthly-tbody"></tbody>
-                        </table>
-                    </div>
-                </section>
-            </aside>
         </div>
 
         <div class="dashboard" id="feed-dashboard-view" style="display: none;">

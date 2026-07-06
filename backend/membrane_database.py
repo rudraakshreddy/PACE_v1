@@ -950,7 +950,15 @@ class MembraneDatabase:
 
         # 5. design_flux_table and saturation_limits (already used in HPA-4040, map from guidelines)
         mem.setdefault("design_flux_table", mem.get("design_flux_guidelines", {}))
-        mem.setdefault("saturation_limits", mem.get("saturation_limits", {}))
+        default_sat = {
+            "LSI": 1.5,
+            "SDSI": 0.5,
+            "CaSO4_pct": 230,
+            "SrSO4_pct": 800,
+            "BaSO4_pct": 6000,
+            "SiO2_pct": 100
+        }
+        mem["saturation_limits"] = mem.get("saturation_limits") or default_sat
 
         return mem
 
