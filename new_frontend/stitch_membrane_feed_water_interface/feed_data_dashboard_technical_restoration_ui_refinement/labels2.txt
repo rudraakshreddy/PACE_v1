@@ -1,0 +1,120 @@
+<tr>
+<th class="p-2 font-black uppercase tracking-tighter">Ion Species</th>
+<th class="p-2 text-right font-black uppercase tracking-tighter">mg/L</th>
+<th class="p-2 text-right font-black uppercase tracking-tighter">meq/L</th>
+<th class="p-2 text-right font-black uppercase tracking-tighter">ppm CaCO₃</th>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Sodium (Na⁺)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="130.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">5.654</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">282.7</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Calcium (Ca²⁺)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="85.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">4.241</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">212.1</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Magnesium (Mg²⁺)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="28.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">2.303</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">115.2</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Potassium (K⁺)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="5.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.128</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">6.4</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Ammonium (NH₄⁺)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="0.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.000</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.0</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Barium (Ba²⁺)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="0.05"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.001</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.0</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Strontium (Sr²⁺)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="0.1"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.002</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.1</td>
+</tr
+----------------------------------------
+<tr>
+<td class="p-2 text-primary-accent uppercase tracking-tighter">Total Cations</td>
+<td class="p-2 text-right text-primary-accent">248.15</td>
+<td class="p-2 text-right text-primary-accent font-mono">12.329</td>
+<td class="p-2 text-right text-primary-accent font-mono">616.5</td>
+</tr
+----------------------------------------
+<tr>
+<th class="p-2 font-black uppercase tracking-tighter">Ion Species</th>
+<th class="p-2 text-right font-black uppercase tracking-tighter">mg/L</th>
+<th class="p-2 text-right font-black uppercase tracking-tighter">meq/L</th>
+<th class="p-2 text-right font-black uppercase tracking-tighter">ppm CaCO₃</th>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Sulphate (SO₄²⁻)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="110.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">2.290</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">114.5</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Alkalinity (as CaCO₃)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="180.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">3.597</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">179.8</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Carbonate (CO₃²⁻)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="2.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.067</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">3.3</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Nitrate (NO₃⁻)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="15.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.242</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">12.1</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Fluoride (F⁻)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="0.8"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">0.042</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">2.1</td>
+</tr
+----------------------------------------
+<tr>
+<td class="font-medium py-1 text-[14px]">Chloride (Cl⁻)</td>
+<td class="text-right py-1"><input class="ion-input w-16 text-right" type="text" value="160.0"/></td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">4.512</td>
+<td class="text-right text-outline font-mono py-1 border border-outline-variant/30 rounded px-2 bg-white">225.6</td>
+</tr
+----------------------------------------
+<tr>
+<td class="p-2 text-tertiary uppercase tracking-tighter">Total Anions</td>
+<td class="p-2 text-right text-tertiary">479.8</td>
+<td class="p-2 text-right text-tertiary font-mono">10.950</td>
+<td class="p-2 text-right text-tertiary font-mono">547.4</td>
+</tr
+----------------------------------------
+<tr><td class="font-medium py-1 text-[14px]">Silica (SiO₂)</td><td class="text-right py-1 bg-[#B0E1F5]"><input class="ion-input w-16 text-right" type="text" value="12.0"/></td><td class="text-right text-outline font-mono py-1 bg-[#B0E1F5] border border-outline-variant/30 rounded px-2">0.200</td><td class="text-right text-outline font-mono py-1 bg-[#B0E1F5] border border-outline-variant/30 rounded px-2">10.0</td></tr
