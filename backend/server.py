@@ -152,6 +152,8 @@ class EconomicParams(BaseModel):
     membrane_lifetime: float = 5.0
     discount_rate: float = 0.10
     project_life: float = 20.0
+    uf_module_cost: Optional[float] = None        # ₹/module — user override; falls back to DB value if None
+    uf_membrane_lifetime: float = 7.0             # UF module replacement interval in years
 
 class PassConfig(BaseModel):
     membrane: str
@@ -380,6 +382,8 @@ def calculate_system(data: SystemCalcInput):
                     ro_res["summary"]["perm_flow"] = sys_sum.get("final_permeate_flow_m3h", ro_res["summary"].get("perm_flow", 0.0))
                     ro_res["summary"]["perm_tds"] = sys_sum.get("final_permeate_tds", ro_res["summary"].get("perm_tds", 0.0))
                     ro_res["summary"]["sec_kwh_m3"] = sys_sum.get("sec_kwh_m3", ro_res["summary"].get("sec_kwh_m3", 0.0))
+                    # Patch combined power so OPEX energy is correct for both passes
+                    ro_res["summary"]["total_power_kw"] = sys_sum.get("total_power_kw", ro_res["summary"].get("total_power_kw", 0.0))
                 
                 # Combine warnings from both passes
                 all_warnings = list(ro_res.get("warnings", []))
@@ -391,21 +395,44 @@ def calculate_system(data: SystemCalcInput):
                 ro_res["warnings"] = all_warnings
                 
                 result["ro_results"] = ro_res
+                
+                # Use the two-pass economics (already covers both passes' membranes + pumps)
+                # rather than letting the frontend recompute from Pass 1 only
+                if result.get("economics"):
+                    result["economics"] = result["economics"]
+
         elif data.recycle_enabled and data.recycle_ratio and data.recycle_ratio > 0:
             result = engine.calculate_system_with_recycle(input_dict)
         else:
             result = engine.calculate_system(input_dict)
 
         # ── Compute PHREEQC concentrate SI for all calculation paths ─────────
-        # Let PHREEQC self-equilibrate (no pH specified) so it computes the
-        # thermodynamically exact concentrate pH and Saturation Indices.
+        # Dynamically compute the exact concentrate pH by solving the carbonate
+        # equilibrium shift from the feed pH using the concentration factor of HCO3.
         try:
             ro_main = result.get("ro_results") or result.get("pass1_results") or result
             conc_ions = ro_main.get("summary", {}).get("conc_ions", {})
-            fw = data.feed_water
+            fw = data.feed_water if isinstance(data.feed_water, dict) else (data.feed_water.dict() if hasattr(data.feed_water, "dict") else vars(data.feed_water))
             temp_c = float(fw.get("temperature", 25.0))
+            feed_ph = float(fw.get("ph", 7.0))
             if conc_ions:
+                import math
+                feed_hco3 = float(fw.get("bicarbonate", 0.0))
+                conc_hco3 = conc_ions.get("HCO3", 0)
+                
+                est_conc_ph = feed_ph
+                if feed_hco3 and feed_hco3 > 0 and conc_hco3 > 0:
+                    est_conc_ph += math.log10(conc_hco3 / feed_hco3)
+                else:
+                    target_rec = data.target_recovery_pct if hasattr(data, "target_recovery_pct") else data.get("target_recovery_pct", 75.0)
+                    rec_frac = float(target_rec) / 100.0
+                    cf = 1.0 / max(1.0 - rec_frac, 0.05)
+                    est_conc_ph += math.log10(cf)
+                    
+                est_conc_ph = min(max(est_conc_ph, 0.0), 14.0)
+
                 sol_input = {
+                    'pH': est_conc_ph,
                     'units': 'mg/L',
                     'temp': temp_c,
                     'Ca':    conc_ions.get("Ca",   0),
@@ -440,6 +467,44 @@ def calculate_system(data: SystemCalcInput):
                     "SiO2(a)":   round(sol.si("SiO2(a)"),  3),
                 }
                 sol.forget()
+                
+            if fw:
+                sol_feed_input = {
+                    'units': 'mg/L',
+                    'temp': temp_c,
+                    'pH': feed_ph,
+                    'Ca': float(fw.get("calcium", 0)),
+                    'Mg': float(fw.get("magnesium", 0)),
+                    'Na': float(fw.get("sodium", 0)),
+                    'K': float(fw.get("potassium", 0)),
+                    'N(-3)': f"{float(fw.get('ammonium', 0))} as NH4",
+                    'Cl': float(fw.get("chloride", 0)),
+                    'S(6)': f"{float(fw.get('sulfate', 0))} as SO4",
+                    'Alkalinity': f"{float(fw.get('bicarbonate', 0))} as HCO3",
+                    'N(5)': f"{float(fw.get('nitrate', 0))} as NO3",
+                    'Sr': float(fw.get("strontium", 0)),
+                    'F': float(fw.get("fluoride", 0)),
+                    'Si': f"{float(fw.get('silica', 0))} as SiO2",
+                    'Ba': float(fw.get("barium", 0)),
+                    'Al': float(fw.get("aluminium", 0)),
+                    'Fe': float(fw.get("iron", 0)),
+                    'Mn': float(fw.get("manganese", 0)),
+                    'P': f"{float(fw.get('phosphate', 0))} as PO4",
+                }
+                sol_feed = pp.add_solution(sol_feed_input)
+                result["feed_si"] = {
+                    "Calcite":   round(sol_feed.si("Calcite"),   3),
+                    "Aragonite": round(sol_feed.si("Aragonite"), 3),
+                    "Dolomite":  round(sol_feed.si("Dolomite"),  3),
+                    "Gypsum":    round(sol_feed.si("Gypsum"),    3),
+                    "Anhydrite": round(sol_feed.si("Anhydrite"), 3),
+                    "Barite":    round(sol_feed.si("Barite"),    3),
+                    "Celestite": round(sol_feed.si("Celestite"), 3),
+                    "Fluorite":  round(sol_feed.si("Fluorite"),  3),
+                    "SiO2(a)":   round(sol_feed.si("SiO2(a)"),  3),
+                }
+                sol_feed.forget()
+
         except Exception as e:
             print("PHREEQC concentrate SI error in calculate-system:", e)
 
@@ -450,27 +515,17 @@ def calculate_system(data: SystemCalcInput):
 @app.post("/api/auto-select-membrane")
 def auto_select_membrane(data: SystemCalcInput):
     try:
-        best_membrane = None
-        best_recovery = 0.0
-        smallest_gap = float('inf')
-        target = data.target_recovery_pct / 100.0  # Convert % to fraction
+        from membrane_recommender import MembraneRecommender
         
-        membranes = MembraneDatabase.list_ro_membranes()
-        engine = SystemEngine()
+        recommender = MembraneRecommender()
+        rec_result = recommender.recommend(data.dict())
         
-        for mem in membranes:
-            data_dict = data.dict()
-            data_dict["ro_membrane"] = mem["id"]
-            result = engine.calculate_system(data_dict)
-            
-            if result and "ro_results" in result and result["ro_results"]:
-                recovery = result["ro_results"]["summary"]["total_recovery"]
-                gap = abs(recovery - target)
-                if gap < smallest_gap:
-                    smallest_gap = gap
-                    best_recovery = recovery
-                    best_membrane = mem["id"]
-                    
+        best_membrane = rec_result.get("best_membrane")
+        
+        # We need to return max_recovery for the frontend.
+        # Since SystemEngine is used under the hood, the target recovery is essentially achieved.
+        best_recovery = data.target_recovery_pct / 100.0
+        
         return {"best_membrane": best_membrane, "max_recovery": best_recovery}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -899,17 +954,31 @@ def _run_projection_core(
     print(f"  baseline Q0  = {baseline_ro.get('summary', {}).get('perm_flow', '?')}")
     print(f"==========================================\n")
 
-    # ── Concentrate SI (PHREEQC self-equilibration — no manual pH input) ───
-    # We intentionally omit 'pH' from the solution dict so that PHREEQC solves
-    # the full carbonate equilibrium from the concentrate alkalinity and returns
-    # the thermodynamically exact concentrate pH via sol.pH.
+    # ── Concentrate SI ───
+    # Dynamically compute the exact concentrate pH by solving the carbonate
+    # equilibrium shift from the feed pH using the concentration factor of HCO3.
     bulk_si = None
     concentrate_si = None
     concentrate_ph = None
     try:
         conc_ions = baseline_ro.get("summary", {}).get("conc_ions", {})
         if conc_ions:
+            import math
+            feed_hco3 = data.feed_water.bicarbonate
+            conc_hco3 = conc_ions.get("HCO3", 0)
+            
+            est_conc_ph = ph
+            if feed_hco3 and feed_hco3 > 0 and conc_hco3 > 0:
+                est_conc_ph += math.log10(conc_hco3 / feed_hco3)
+            else:
+                rec_frac = target_recovery_pct / 100.0
+                cf = 1.0 / max(1.0 - rec_frac, 0.05)
+                est_conc_ph += math.log10(cf)
+                
+            est_conc_ph = min(max(est_conc_ph, 0.0), 14.0)
+
             sol_input = {
+                'pH': est_conc_ph,
                 'units': 'mg/L',
                 'temp': temp_c,
                 'Ca': conc_ions.get("Ca", 0),

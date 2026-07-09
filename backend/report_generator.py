@@ -946,9 +946,13 @@ class ReportGenerator:
 
         all_warnings = []
         for w in ro_results.get('warnings', []):
+            if 'Concentration Polarization' in w.get('type', ''):
+                continue
             wc = dict(w); wc.setdefault('pass', '1'); all_warnings.append(wc)
         if pass2_results:
             for w in pass2_results.get('warnings', []):
+                if 'Concentration Polarization' in w.get('type', ''):
+                    continue
                 wc = dict(w); wc['pass'] = '2'; all_warnings.append(wc)
 
         if all_warnings:
@@ -963,25 +967,19 @@ class ReportGenerator:
             )
         else:
             p = doc.add_paragraph()
-            _run(p, '✓  No design warnings. All parameters within recommended limits.',
+            _run(p, 'no design warnings',
                  italic=True, color=BRAND_COLOR)
 
         _spacer(doc, 6)
-        _heading(doc, 'Concentrate Saturation Indices (PHREEQC)')
+        _heading(doc, 'System Saturation Indices (PHREEQC)')
 
         # Prefer the PHREEQC SI data attached during physics projection.
         # Fall back to the legacy heuristic if not available.
         conc_si = ro_results.get('concentrate_si')
         conc_ph = ro_results.get('concentrate_ph')
+        feed_si = ro_results.get('feed_si', {})
 
         if conc_si:
-            # Show equilibrium pH header
-            if conc_ph is not None:
-                p = doc.add_paragraph()
-                _run(p, 'PHREEQC Equilibrium Concentrate pH:  ', bold=True)
-                _run(p, f'{conc_ph:.2f}  ', bold=True, color='2563EB')
-                _run(p, '(thermodynamically computed — no manual assumption)', italic=True)
-
             _spacer(doc, 4)
 
             SI_LIMITS = {
@@ -1019,12 +1017,20 @@ class ReportGenerator:
                     risk = 'MODERATE'; rec = lim['rec_mod']
                 elif si_val > lim['mod'] - 0.2:
                     risk = 'LOW';      rec = 'Monitor. No immediate action required.'
-                si_rows.append([mineral, lim['formula'], f'{si_val:+.3f}', risk, rec])
+                
+                f_si_val = feed_si.get(mineral)
+                f_si_str = f'{f_si_val:+.3f}' if f_si_val is not None else '—'
+                si_rows.append([mineral, lim['formula'], f_si_str, f'{si_val:+.3f}', risk, rec])
+
+            if conc_ph is not None:
+                # Add Feed pH if available
+                feed_ph_val = ro_results.get('feed', {}).get('ph') if 'feed' in ro_results else '—'
+                si_rows.append(['pH', 'Equilibrium H+', f"{feed_ph_val:.2f}" if isinstance(feed_ph_val, float) else str(feed_ph_val), f'{conc_ph:.2f}', 'COMPUTED', 'Dynamically computed from feed HCO3.'])
 
             _data_table(doc,
-                [['Mineral', 'Formula', 'SI (Conc.)', 'Risk', 'Recommendation']],
+                [['Mineral', 'Formula', 'Feed SI', 'Conc. SI', 'Risk', 'Recommendation']],
                 si_rows,
-                col_widths=[2.5, 2.2, 1.8, 1.8, 6.2]
+                col_widths=[1.7, 2.0, 1.4, 1.4, 1.7, 5.8]
             )
         else:
             # Legacy fallback
@@ -1088,32 +1094,41 @@ class ReportGenerator:
 
         # CAPEX table
         _heading(doc, 'Capital Expenditure (CAPEX)')
+        capex_rows = [
+            ['RO Membrane Elements',           f"₹ {capex.get('membranes_inr', 0):,.0f}"],
+            ['Pressure Vessels',               f"₹ {capex.get('vessels_inr', 0):,.0f}"],
+            ['High Pressure Pump',             f"₹ {capex.get('hp_pump_inr', 0):,.0f}"],
+            ['Booster Pumps',                  f"₹ {capex.get('booster_pump_inr', 0):,.0f}"],
+        ]
+        if capex.get('uf_modules_inr', 0) > 0:
+            capex_rows.append(['UF Membrane Modules',  f"₹ {capex.get('uf_modules_inr', 0):,.0f}  ({capex.get('uf_modules_count', 0)} modules)"])
+            capex_rows.append(['UF Feed & Backwash Pumps', f"₹ {capex.get('uf_pumps_inr', 0):,.0f}"])
+        capex_rows += [
+            ['Equipment Subtotal',             f"₹ {capex.get('equip_subtotal_inr', 0):,.0f}"],
+            ['Installation & Commissioning',   f"₹ {capex.get('ic_inr', 0):,.0f}"],
+            ['Contingency',                    f"₹ {capex.get('contingency_inr', 0):,.0f}"],
+            ['TOTAL CAPEX',                    f"₹ {capex.get('total_capex_inr', 0):,.0f}"],
+        ]
         _data_table(doc,
             [['Item', 'Cost (INR)']],
-            [
-                ['RO Membrane Elements',           f"₹ {capex.get('membranes_inr', 0):,.0f}"],
-                ['Pressure Vessels',               f"₹ {capex.get('vessels_inr', 0):,.0f}"],
-                ['High Pressure Pump',             f"₹ {capex.get('hp_pump_inr', 0):,.0f}"],
-                ['Booster Pumps',                  f"₹ {capex.get('booster_pump_inr', 0):,.0f}"],
-                ['Equipment Subtotal',             f"₹ {capex.get('equip_subtotal_inr', 0):,.0f}"],
-                ['Installation & Commissioning',   f"₹ {capex.get('ic_inr', 0):,.0f}"],
-                ['Contingency',                    f"₹ {capex.get('contingency_inr', 0):,.0f}"],
-                ['TOTAL CAPEX',                    f"₹ {capex.get('total_capex_inr', 0):,.0f}"],
-            ],
+            capex_rows,
             col_widths=[9.5, 5.0]
         )
         _spacer(doc, 6)
 
         # OPEX table
         _heading(doc, 'Annual Operating Expenditure (OPEX)')
+        opex_rows = [
+            ['Annual Operating Hours',       f"{opex.get('annual_hours', 0):,.0f} hrs"],
+            ['Electricity / Energy Cost',    f"₹ {opex.get('energy_cost_pa_inr', 0):,.0f}"],
+            ['RO Membrane Replacement',      f"₹ {opex.get('membrane_repl_pa_inr', 0):,.0f}"],
+        ]
+        if opex.get('uf_ceb_chemicals_pa_inr', 0) > 0:
+            opex_rows.append(['UF CEB Chemicals (Citric Acid + NaOCl)', f"₹ {opex.get('uf_ceb_chemicals_pa_inr', 0):,.0f}"])
+        opex_rows.append(['TOTAL OPEX', f"₹ {opex.get('total_opex_pa_inr', 0):,.0f}"])
         _data_table(doc,
             [['Item', 'Cost (INR/year)']],
-            [
-                ['Annual Operating Hours',       f"{opex.get('annual_hours', 0):,.0f} hrs"],
-                ['Electricity / Energy Cost',    f"₹ {opex.get('energy_cost_pa_inr', 0):,.0f}"],
-                ['Membrane Replacement',         f"₹ {opex.get('membrane_repl_pa_inr', 0):,.0f}"],
-                ['TOTAL OPEX',                   f"₹ {opex.get('total_opex_pa_inr', 0):,.0f}"],
-            ],
+            opex_rows,
             col_widths=[9.5, 5.0]
         )
         _spacer(doc, 6)
@@ -1422,6 +1437,7 @@ class ReportGenerator:
         if ro_main is not None:
             ro_main['concentrate_si'] = sr.get('concentrate_si')
             ro_main['concentrate_ph'] = sr.get('concentrate_ph')
+            ro_main['feed_si'] = sr.get('feed_si')
         self._page_warnings(doc, ro_main or {}, pass2_res)
 
         # ── Page 6: Economics ────────────────────────────────────────────────

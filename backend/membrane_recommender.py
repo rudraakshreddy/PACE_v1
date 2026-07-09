@@ -31,11 +31,27 @@ class MembraneRecommender:
                 if v.get("type") == "NF"
             }
         else:
-            # Recommend Permionics RO membranes
-            candidates = {
+            # Calculate approximate feed TDS to filter membrane types early
+            feed_water = inputs.get("feed_water", {})
+            numeric_ions = [v for k, v in feed_water.items() if isinstance(v, (int, float)) and k not in ["temperature", "ph", "turbidity", "tss", "sdi15", "toc_mg_l", "cl2_residual_mg_l", "tds"]]
+            approx_tds = sum(numeric_ions)
+            
+            all_ro = {
                 k: v for k, v in MembraneDatabase.RO_MEMBRANES.items()
                 if v.get("manufacturer", "").lower() == "permionics" and v.get("type") in ["BWRO", "SWRO"]
             }
+            
+            candidates = {}
+            for k, v in all_ro.items():
+                mem_type = v.get("type", "BWRO")
+                if approx_tds > 20000:
+                    if mem_type == "SWRO":
+                        candidates[k] = v
+                elif approx_tds >= 15000:
+                    candidates[k] = v
+                else:
+                    if mem_type != "SWRO":
+                        candidates[k] = v
         
         if not candidates:
             return {"recommendations": [], "message": "No matching membranes found for the selected technology train."}
@@ -193,15 +209,23 @@ class MembraneRecommender:
             env_score -= min(10, (max_beta - 1.20) * 50)
             justification.append(f"High concentration polarization (\u03b2={max_beta:.2f}). Ensure sufficient cross-flow.")
         
-        env_score = max(0, env_score)
-        criteria["envelope"] = round(env_score, 1)
-        score += env_score
-        
         # Determine application type suitability if necessary (e.g. SWRO vs BWRO)
         mem_type = mem.get("type", "BWRO")
+        feed_tds = summary.get("feed_tds", 0)
+        
         if source_type in ["SEAWATER", "SEAWATER_BEACH"] and mem_type != "SWRO":
             dq = True
             dq_reason = "Membrane type is not suitable for Seawater application."
+        elif feed_tds > 20000 and mem_type != "SWRO":
+            dq = True
+            dq_reason = f"High salinity ({feed_tds:.0f} mg/L). SWRO is strictly required for >20,000 mg/L TDS."
+        elif 15000 <= feed_tds <= 20000 and mem_type == "BWRO":
+            justification.append(f"WARNING: High salinity transition zone ({feed_tds:.0f} mg/L). BWRO used but SWRO recommended for safety margin.")
+            env_score -= 5
+            
+        env_score = max(0, env_score)
+        criteria["envelope"] = round(env_score, 1)
+        score += env_score
             
         return {
             "total": score,

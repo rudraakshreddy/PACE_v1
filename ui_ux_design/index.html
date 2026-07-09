@@ -7,9 +7,9 @@
     <meta name="description" content="PACE: Permionics membrane process design and projection software for RO/NF system engineering.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=47">
+    <link rel="stylesheet" href="styles.css?v=53">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -35,15 +35,14 @@
                 </button>
             </div>
             <div class="header-right">
-                <div class="search-bar">
-                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                    <input type="text" placeholder="Search parameters..." id="global-search-input">
-                </div>
                 <button class="btn-primary" id="run-analysis-btn">Run Analysis</button>
                 <div class="header-icons">
+                    <button class="icon-btn" id="theme-toggle-btn" title="Toggle Theme">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
                     <button class="icon-btn"><i class="fa-regular fa-bell"></i></button>
                     <button class="icon-btn"><i class="fa-solid fa-gear"></i></button>
-                    <div class="user-profile" onclick="openUserInfoModal()" title="User Information">JD</div>
+                    <div class="user-profile" onclick="openUserInfoModal()" title="User Information">WT</div>
                 </div>
             </div>
         </header>
@@ -525,10 +524,6 @@
         <div class="dashboard" id="scaling-panel-view" style="display: none; grid-template-columns: 1fr 450px; gap: 16px; padding: 16px;">
 
             <main style="display: flex; flex-direction: column; gap: 12px;">
-                <div class="page-title-block" style="margin-bottom: 1rem;">
-                    <h1 style="color: var(--text-primary); font-size: 1.5rem; margin: 0;">Scaling & Fouling Analysis</h1>
-                    <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0;">Evaluate saturation indices for feed water chemistry.</p>
-                </div>
                 <section class="card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0;">
                     <div class="card-header">
                         <h2 class="card-title" style="color: white; font-weight: 700; text-transform: uppercase; font-size: 1.1rem; letter-spacing: 0.5px;"><i class="fa-solid fa-triangle-exclamation" style="color: rgba(255,255,255,0.8);"></i> SCALING & FOULING INDICES</h2>
@@ -593,6 +588,9 @@
                                 <span class="si-value" id="si-po4">--</span>
                                 <div class="si-bar-container"><div class="si-bar" id="si-bar-po4"></div></div>
                             </div>
+                        </div>
+                        <div style="margin-top: 1rem; font-size: 0.7rem; color: var(--text-secondary); text-align: center; font-style: italic; opacity: 0.8; padding-top: 1rem; border-top: 1px solid var(--card-border);">
+                            * Saturation indices are calculated using the PHREEQC thermodynamic database developed by the USGS.
                         </div>
                     </div>
                 </section>
@@ -777,8 +775,7 @@
                             <input type="number" id="calc-target-recovery" value="75.0" step="1">
                         </div>
                     </div>
-                    
-                    <div id="calc-recycle-container" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--card-border);">
+                    <div id="calc-recycle-container" style="padding: 1rem 16px; border-top: 1px solid var(--card-border);">
                         <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--primary-color);"><i class="fa-solid fa-recycle"></i> Concentrate Recycle</h3>
                         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
                             <label class="switch">
@@ -946,7 +943,7 @@
                         </label>
                     </div>
 
-                    <div id="calc-physics-options" style="display: none; margin-top: 0.5rem;">
+                    <div id="calc-physics-options" style="display: none; padding: 12px 16px;">
                         <div style="margin-bottom: 0.9rem;">
                             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.4rem;">Projection Year</label>
                             <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;" id="calc-physics-year-pills">
@@ -960,7 +957,7 @@
                         </div>
 
                         <!-- CIP Protocol -->
-                        <div class="input-grid" style="margin-bottom: 0.5rem;">
+                        <div class="input-grid" style="margin-bottom: 0.5rem; padding: 0;">
                             <div class="input-group">
                                 <label>CIP Interval <span class="unit">months</span></label>
                                 <input type="number" id="phys-cip-interval" value="0" min="0" max="60" step="1"
@@ -980,7 +977,7 @@
                     </div>
                 </section>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <button class="btn" id="calc-run-btn" style="padding: 1rem; font-size: 1.0rem; background: linear-gradient(135deg, #1e40af, #2563eb);">
                         <i class="fa-solid fa-calculator"></i> Run Detailed Calculation
                     </button>
@@ -1001,35 +998,35 @@
 
                 <div id="calc-results-container" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
                     <!-- Sub-tabs for Calculation Results -->
-                    <div class="menu-bar" style="margin-bottom: 0.5rem; padding: 0.2rem; background: rgba(0, 0, 0, 0.05); border-radius: 4px; display: flex; gap: 0.4rem;">
+                    <div class="menu-bar" style="margin-bottom: 0.5rem; padding: 0.2rem; background: rgba(0, 0, 0, 0.05); border-radius: 4px; display: flex; gap: 0.2rem; overflow-x: auto; white-space: nowrap;">
                         
-                        <button class="menu-btn active" id="calc-subtab-overview" onclick="switchCalcSubTab('overview', event)">
+                        <button class="menu-btn active" id="calc-subtab-overview" onclick="switchCalcSubTab('overview', event)" style="flex: none; justify-content: center; padding: 0.25rem 0.75rem; font-size: 9.5px; gap: 3px;">
                             <i class="fa-solid fa-square-poll-horizontal"></i> Overview
                         </button>
-                        <button class="menu-btn" id="calc-subtab-membrane" onclick="switchCalcSubTab('membrane', event)">
+                        <button class="menu-btn" id="calc-subtab-membrane" onclick="switchCalcSubTab('membrane', event)" style="flex: none; justify-content: center; padding: 0.25rem 0.75rem; font-size: 9.5px; gap: 3px;">
                             <i class="fa-solid fa-layer-group"></i> Membrane Recommendation
                         </button>
-                        <button class="menu-btn" id="calc-subtab-hydraulic" onclick="switchCalcSubTab('hydraulic', event)">
+                        <button class="menu-btn" id="calc-subtab-hydraulic" onclick="switchCalcSubTab('hydraulic', event)" style="flex: none; justify-content: center; padding: 0.25rem 0.75rem; font-size: 9.5px; gap: 3px;">
                             <i class="fa-solid fa-list-ol"></i> Hydraulic Profile
                         </button>
-                        <button class="menu-btn" id="calc-subtab-ion" onclick="switchCalcSubTab('ion', event)">
+                        <button class="menu-btn" id="calc-subtab-ion" onclick="switchCalcSubTab('ion', event)" style="flex: none; justify-content: center; padding: 0.25rem 0.75rem; font-size: 9.5px; gap: 3px;">
                             <i class="fa-solid fa-flask"></i> Ion Profile
                         </button>
-                        <button class="menu-btn" id="calc-subtab-economics" onclick="switchCalcSubTab('economics', event)">
+                        <button class="menu-btn" id="calc-subtab-economics" onclick="switchCalcSubTab('economics', event)" style="flex: none; justify-content: center; padding: 0.25rem 0.75rem; font-size: 9.5px; gap: 3px;">
                             <i class="fa-solid fa-indian-rupee-sign"></i> Economic Analysis
                         </button>
-                        <button class="menu-btn" id="calc-subtab-pfd" onclick="switchCalcSubTab('pfd', event)">
+                        <button class="menu-btn" id="calc-subtab-pfd" onclick="switchCalcSubTab('pfd', event)" style="flex: none; justify-content: center; padding: 0.25rem 0.75rem; font-size: 9.5px; gap: 3px;">
                             <i class="fa-solid fa-project-diagram"></i> Process Diagram
                         </button>
-                        <button class="menu-btn" id="calc-subtab-physics" onclick="switchCalcSubTab('physics', event)" style="display: none; color: #818cf8; border-color: rgba(99,102,241,0.3);">
+                        <button class="menu-btn" id="calc-subtab-physics" onclick="switchCalcSubTab('physics', event)" style="flex: none; justify-content: center; color: #818cf8; border-color: rgba(99,102,241,0.3); padding: 0.25rem 0.75rem; font-size: 9.5px; gap: 3px;">
                             <i class="fa-solid fa-atom"></i> Year-Wise Performance
                         </button>
                     </div>
 
                     <!-- Scrollable wrapper for active tab content -->
-                    <div id="calc-results-scroll-wrapper" style="overflow-y: auto; max-height: calc(100vh - 185px); flex-grow: 1; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                    <div id="calc-results-scroll-wrapper" style="overflow-y: auto; max-height: calc(100vh - 185px); flex-grow: 1; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
                         <!-- SUBTAB: Overview -->
-                        <div id="calc-content-overview" style="display: flex; flex-direction: column; gap: 1rem; width: 100%; flex-grow: 1;">
+                        <div id="calc-content-overview" style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%; flex-grow: 1;">
                             <!-- UF Overview (if applicable) -->
                             <section class="card" id="calc-uf-results-card" style="display: none;">
                                 <div class="card-header">
@@ -1085,7 +1082,7 @@
                              </section>
 
                              <!-- Two-Pass RO System Summary (Visible only in 2P-RO mode) -->
-                             <div id="calc-two-pass-summary-container" style="display: none; flex-direction: column; gap: 1rem;">
+                             <div id="calc-two-pass-summary-container" style="display: none; flex-direction: column; gap: 0.5rem;">
                                  <!-- Pass 1 Overview Panel -->
                                  <section class="card" style="border-color: rgba(99, 102, 241, 0.2);">
                                      <div class="card-header" style="background: rgba(99, 102, 241, 0.03);">
@@ -1235,7 +1232,7 @@
                         </div>
 
                         <!-- SUBTAB: Membrane Recommendation -->
-                        <div id="calc-content-membrane" style="display: none; flex-direction: column; gap: 1rem; width: 100%;">
+                        <div id="calc-content-membrane" style="display: none; flex-direction: column; gap: 0.5rem; width: 100%;">
                             
                  <!-- Top Row: Best Recommendation and Score -->
                  <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; grid-column: span 2;">
@@ -1262,11 +1259,11 @@
                   </div>
 
                   <!-- Ranked Membrane Options -->
-                  <section class="card" style="box-shadow: 0 4px 20px rgba(0,0,0,0.15); grid-column: span 2; height: 100%; display: flex; flex-direction: column;">
+                  <section class="card" style="box-shadow: 0 4px 20px rgba(0,0,0,0.15); grid-column: span 2; display: flex; flex-direction: column;">
                       <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
                           <h2 class="card-title">Ranked Candidate Membranes</h2>
                       </div>
-                      <div style="margin-top: 1.2rem; display: flex; flex-direction: column; gap: 1rem; flex-grow: 1;" id="membrane-candidates-list">
+                      <div style="margin-top: 1.2rem; display: flex; flex-direction: column; gap: 1rem;" id="membrane-candidates-list">
                           <div style="text-align: center; color: var(--text-secondary); padding: 3rem 0;">
                               <i class="fa-solid fa-sliders" style="font-size: 2.5rem; margin-bottom: 0.8rem; opacity: 0.3; color: var(--accent-color);"></i><br>
                               Configure parameters in feed tab and run the recommender to view options.
@@ -1354,10 +1351,7 @@
                             <section class="card" id="calc-si-card" style="display:none; margin-top: 1rem;">
                                 <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                                     <h2 class="card-title"><i class="fa-solid fa-flask-vial" style="color:var(--primary-color); margin-right:0.5rem;"></i>Concentrate Scaling Risks (PHREEQC)</h2>
-                                    <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:var(--text-secondary);">
-                                        Equilibrium Concentrate pH:&nbsp;
-                                        <span id="calc-conc-ph" style="font-weight:700; font-size:1rem; color:var(--primary-color);">—</span>
-                                    </div>
+
                                 </div>
                                 <div class="card-content" style="overflow-x:auto; padding:0;">
                                     <table class="report-table calc-element-table" style="width:100%; border-collapse:collapse;">
@@ -1373,51 +1367,63 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <div style="padding:0.6rem 1rem; font-size:0.7rem; color:var(--text-secondary); border-top:1px solid var(--border-color);">
-                                    SI = log₁₀(Ion Activity Product / Ksp). SI &gt; 0 indicates supersaturation. PHREEQC self-equilibrates concentrate chemistry — pH shown is thermodynamically computed, not assumed.
-                                </div>
+
                             </section>
                         </div>
 
                         <!-- SUBTAB: Economics -->
-                        <div id="calc-content-economics" style="display: none; flex-direction: column; gap: 1rem; width: 100%;">
+                        <div id="calc-content-economics" style="display: none; flex-direction: column; gap: 0.5rem; width: 100%;">
                             <!-- Input Parameters -->
                             <section class="card">
                                 <div class="card-header">
                                     <h2 class="card-title">Economic Parameters</h2>
                                 </div>
-                                <div class="card-content" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem;">
-                                    <div class="input-group">
-                                        <label for="eco-tariff">Electricity Tariff <span class="unit">₹/kWh</span></label>
-                                        <input type="number" id="eco-tariff" value="7.50" step="0.1">
+                                <div class="card-content" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                                    <!-- Row 1: RO Parameters (always shown) -->
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem;">
+                                        <div class="input-group">
+                                            <label for="eco-tariff">Electricity Tariff <span class="unit">₹/kWh</span></label>
+                                            <input type="number" id="eco-tariff" value="7.50" step="0.1">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-mem-cost">RO Membrane Cost <span class="unit">₹/elem</span></label>
+                                            <input type="number" id="eco-mem-cost" value="26880" step="any">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-ves-cost">RO Vessel Cost <span class="unit">₹/vessel</span></label>
+                                            <input type="number" id="eco-ves-cost" value="48000" step="1000">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-pump-cost">Pump Cost <span class="unit">₹/kW</span></label>
+                                            <input type="number" id="eco-pump-cost" value="96000" step="1000">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-ic-factor">I&amp;C Factor <span class="unit">%</span></label>
+                                            <input type="number" id="eco-ic-factor" value="15" step="1" max="100">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-cont-factor">Contingency <span class="unit">%</span></label>
+                                            <input type="number" id="eco-cont-factor" value="10" step="1" max="100">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-mem-life">RO Membrane Life <span class="unit">years</span></label>
+                                            <input type="number" id="eco-mem-life" value="5" step="1">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-avail">Availability <span class="unit">%</span></label>
+                                            <input type="number" id="eco-avail" value="90" step="1" max="100">
+                                        </div>
                                     </div>
-                                    <div class="input-group">
-                                        <label for="eco-mem-cost">Membrane Cost <span class="unit">₹/elem</span></label>
-                                        <input type="number" id="eco-mem-cost" value="26880" step="any">
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="eco-ves-cost">Vessel Cost <span class="unit">₹/vessel</span></label>
-                                        <input type="number" id="eco-ves-cost" value="48000" step="1000">
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="eco-pump-cost">Pump Cost <span class="unit">₹/kW</span></label>
-                                        <input type="number" id="eco-pump-cost" value="96000" step="1000">
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="eco-ic-factor">I&C Factor <span class="unit">%</span></label>
-                                        <input type="number" id="eco-ic-factor" value="15" step="1" max="100">
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="eco-cont-factor">Contingency <span class="unit">%</span></label>
-                                        <input type="number" id="eco-cont-factor" value="10" step="1" max="100">
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="eco-mem-life">Membrane Life <span class="unit">years</span></label>
-                                        <input type="number" id="eco-mem-life" value="5" step="1">
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="eco-avail">Availability <span class="unit">%</span></label>
-                                        <input type="number" id="eco-avail" value="90" step="1" max="100">
+                                    <!-- Row 2: UF Parameters (shown only when UF train selected) -->
+                                    <div id="eco-uf-params-row" style="display: none; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; padding-top: 0.6rem; border-top: 1px dashed rgba(99,102,241,0.3);">
+                                        <div class="input-group">
+                                            <label for="eco-uf-mod-cost">UF Module Cost <span class="unit">₹/module</span></label>
+                                            <input type="number" id="eco-uf-mod-cost" value="120000" step="1000">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="eco-uf-mem-life">UF Module Life <span class="unit">years</span></label>
+                                            <input type="number" id="eco-uf-mem-life" value="7" step="1">
+                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -1435,6 +1441,8 @@
                                                 <tr><td>Pressure Vessels</td><td id="eco-capex-ves" style="text-align: right;">-</td></tr>
                                                 <tr><td>HP Pump</td><td id="eco-capex-hp" style="text-align: right;">-</td></tr>
                                                 <tr><td>Booster Pumps</td><td id="eco-capex-bp" style="text-align: right;">-</td></tr>
+                                                <tr id="eco-capex-uf-mod-row" style="display:none;"><td>UF Membrane Modules</td><td id="eco-capex-uf-mod" style="text-align: right;">-</td></tr>
+                                                <tr id="eco-capex-uf-pump-row" style="display:none;"><td>UF Feed &amp; BW Pumps</td><td id="eco-capex-uf-pump" style="text-align: right;">-</td></tr>
                                                 <tr style="border-top: 1px dashed rgba(0, 0, 0, 0.2);">
                                                     <td><strong>Equip. Subtotal</strong></td><td id="eco-capex-sub" style="text-align: right;"><strong>-</strong></td>
                                                 </tr>
@@ -1458,7 +1466,9 @@
                                         <table class="report-table" style="width: 100%; border-collapse: collapse;">
                                             <tbody id="eco-opex-tbody">
                                                 <tr><td>Energy Cost</td><td id="eco-opex-energy" style="text-align: right;">-</td></tr>
-                                                <tr><td>Membrane Replacement</td><td id="eco-opex-mem" style="text-align: right;">-</td></tr>
+                                                <tr><td>RO Membrane Replacement</td><td id="eco-opex-mem" style="text-align: right;">-</td></tr>
+                                                <tr id="eco-opex-uf-mem-row" style="display:none;"><td>UF Module Replacement</td><td id="eco-opex-uf-mem" style="text-align: right;">-</td></tr>
+                                                <tr id="eco-opex-uf-chem-row" style="display:none;"><td>UF CEB Chemicals</td><td id="eco-opex-uf-chem" style="text-align: right;">-</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -1492,7 +1502,7 @@
                         </div>
 
                         <!-- SUBTAB: Process Flow Diagram -->
-                        <div id="calc-content-pfd" style="display: none; flex-direction: column; gap: 1rem; width: 100%;">
+                        <div id="calc-content-pfd" style="display: none; flex-direction: column; gap: 0.5rem; width: 100%;">
                             <section class="card">
                                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                                     <h2 class="card-title">Process Flow Diagram</h2>
@@ -1505,7 +1515,7 @@
                             </div>
 
                         <!-- SUBTAB: Physics Projection -->
-                        <div id="calc-content-physics" style="display: none; flex-direction: column; gap: 1rem; width: 100%;">
+                        <div id="calc-content-physics" style="display: none; flex-direction: column; gap: 0.5rem; width: 100%;">
 
                             <!-- Year Banner -->
                             <div id="phys-year-banner" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 10px; padding: 0.8rem 1.4rem; display: flex; align-items: center; justify-content: space-between;">
@@ -1519,51 +1529,53 @@
                                 <div class="card-header">
                                     <h2 class="card-title">Performance — <span id="phys-card-year-label">Year 0 (Baseline)</span></h2>
                                 </div>
-                                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
-                                    <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
-                                        <div class="telemetry-label">Feed Pressure</div>
-                                        <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-press">-</span> <span style="font-size: 0.7rem; color: var(--text-secondary);">bar</span></div>
-                                        <div id="phys-card-press-delta" style="font-size: 0.72rem; margin-top: 0.2rem; font-weight: 600; color: #f87171;"></div>
+                                <div class="card-content" style="padding: 1rem;">
+                                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;">
+                                        <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
+                                            <div class="telemetry-label">Feed Pressure</div>
+                                            <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-press">-</span> <span style="font-size: 0.7rem; color: var(--text-secondary);">bar</span></div>
+                                            <div id="phys-card-press-delta" style="font-size: 0.72rem; margin-top: 0.2rem; font-weight: 600; color: #f87171;"></div>
+                                        </div>
+                                        <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
+                                            <div class="telemetry-label">Permeate Flow</div>
+                                            <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-flow">-</span> <span style="font-size: 0.7rem; color: var(--text-secondary);">m³/h</span></div>
+                                            <div id="phys-card-flow-delta" style="font-size: 0.72rem; margin-top: 0.2rem; font-weight: 600; color: #34d399;"></div>
+                                        </div>
+                                        <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
+                                            <div class="telemetry-label">NPF</div>
+                                            <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-npf">-</span></div>
+                                            <div id="phys-card-npf-delta" style="font-size: 0.72rem; margin-top: 0.2rem; font-weight: 600; color: #f87171;"></div>
+                                        </div>
+                                        <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
+                                            <div class="telemetry-label">FRI</div>
+                                            <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-fri">-</span></div>
+                                            <div id="phys-card-fri-label" style="font-size: 0.72rem; margin-top: 0.2rem; color: var(--text-secondary);">Fouling Resistance Index</div>
+                                        </div>
+                                        <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
+                                            <div class="telemetry-label">B Relative</div>
+                                            <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-brel">-</span></div>
+                                            <div id="phys-card-brel-label" style="font-size: 0.72rem; margin-top: 0.2rem; color: var(--text-secondary);">Salt Perm. Degradation</div>
+                                        </div>
                                     </div>
-                                    <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
-                                        <div class="telemetry-label">Permeate Flow</div>
-                                        <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-flow">-</span> <span style="font-size: 0.7rem; color: var(--text-secondary);">m³/h</span></div>
-                                        <div id="phys-card-flow-delta" style="font-size: 0.72rem; margin-top: 0.2rem; font-weight: 600; color: #34d399;"></div>
-                                    </div>
-                                    <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
-                                        <div class="telemetry-label">NPF</div>
-                                        <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-npf">-</span></div>
-                                        <div id="phys-card-npf-delta" style="font-size: 0.72rem; margin-top: 0.2rem; font-weight: 600; color: #f87171;"></div>
-                                    </div>
-                                    <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
-                                        <div class="telemetry-label">FRI</div>
-                                        <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-fri">-</span></div>
-                                        <div id="phys-card-fri-label" style="font-size: 0.72rem; margin-top: 0.2rem; color: var(--text-secondary);">Fouling Resistance Index</div>
-                                    </div>
-                                    <div class="telemetry-card" style="min-height: 90px; padding: 0.8rem 0.5rem; border: 1.5px solid rgba(99,102,241,0.3);">
-                                        <div class="telemetry-label">B Relative</div>
-                                        <div class="telemetry-val" style="font-size: 1.3rem;"><span id="phys-card-brel">-</span></div>
-                                        <div id="phys-card-brel-label" style="font-size: 0.72rem; margin-top: 0.2rem; color: var(--text-secondary);">Salt Perm. Degradation</div>
-                                    </div>
-                                </div>
 
-                                <!-- Additional metrics row -->
-                                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--card-border);">
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">Recovery</div>
-                                        <div style="font-size: 1.1rem; font-weight: 700;"><span id="phys-card-rec">-</span>%</div>
-                                    </div>
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">Permeate TDS</div>
-                                        <div style="font-size: 1.1rem; font-weight: 700;"><span id="phys-card-tds">-</span> <span style="font-size: 0.75rem; font-weight: normal;">mg/L</span></div>
-                                    </div>
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">SEC</div>
-                                        <div style="font-size: 1.1rem; font-weight: 700;"><span id="phys-card-sec">-</span> <span style="font-size: 0.75rem; font-weight: normal;">kWh/m³</span></div>
-                                    </div>
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">CIP Events</div>
-                                        <div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b;"><span id="phys-card-cips">-</span></div>
+                                    <!-- Additional metrics row -->
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--card-border);">
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">Recovery</div>
+                                            <div style="font-size: 1.1rem; font-weight: 700;"><span id="phys-card-rec">-</span>%</div>
+                                        </div>
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">Permeate TDS</div>
+                                            <div style="font-size: 1.1rem; font-weight: 700;"><span id="phys-card-tds">-</span> <span style="font-size: 0.75rem; font-weight: normal;">mg/L</span></div>
+                                        </div>
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">SEC</div>
+                                            <div style="font-size: 1.1rem; font-weight: 700;"><span id="phys-card-sec">-</span> <span style="font-size: 0.75rem; font-weight: normal;">kWh/m³</span></div>
+                                        </div>
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);">CIP Events</div>
+                                            <div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b;"><span id="phys-card-cips">-</span></div>
+                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -1698,19 +1710,15 @@
             </main>
         </div>
 
-        <div id="feed-dashboard-view" style="display: none; padding: 2rem; flex-direction: column; gap: 1.5rem; flex: 1;">
-            <div class="page-title-block" style="margin-bottom: 0;">
-                <h1 class="page-title">Feed Water Analysis</h1>
-                <p class="page-subtitle">Define the ionic composition, physical parameters, and fouling indicators of the source water.</p>
-            </div>
-            <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.5rem; align-items: start; flex: 1;">
-                <main class="data-entry" style="display: grid !important; grid-template-columns: 1fr 1fr; gap: 1.5rem; flex-direction: unset;">
+        <div id="feed-dashboard-view" style="display: none; padding: 1rem; flex-direction: column; gap: 0.5rem; flex: 1;">
+            <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1rem; align-items: start; flex: 1;">
+                <main class="data-entry" style="display: grid !important; grid-template-columns: 1fr 1fr; gap: 1rem; flex-direction: unset; align-items: stretch;">
                 <!-- Physical Parameters -->
-                <section class="card">
+                <section class="card" style="height: 100%;">
                     <div class="card-header">
                         <h2 class="card-title">Physical Parameters</h2>
                     </div>
-                    <div class="input-grid">
+                    <div class="input-grid" style="grid-template-columns: 1fr 1fr; align-content: start;">
                         <div class="input-group">
                             <label for="water-type">Feed Water Type</label>
                             <select id="water-type" class="water-type-select">
@@ -1764,7 +1772,7 @@
 
 
                 <!-- Fouling & Pre-Treatment -->
-                <section class="card">
+                <section class="card" style="height: 100%;">
                     <div class="card-header">
                         <h2 class="card-title">Fouling Indicators</h2>
                     </div>
@@ -1934,7 +1942,7 @@
             </main>
 
             <!-- Results Sidebar -->
-            <aside class="results-panel" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <aside class="results-panel" style="display: flex; flex-direction: column; gap: 1rem;">
                 <!-- System Units Card -->
                 <section class="card" style="margin-bottom: 0.75rem;">
                     <div class="card-header">
@@ -2018,7 +2026,7 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=59"></script>
+    <script src="script.js?v=93"></script>
 <div id="global-loader" class="pace-loader--overlay">
   <div class="pace-loader" role="status" aria-live="polite" aria-label="Loading">
     <svg width="180" height="76" viewBox="0 0 420 170" role="img" aria-label="Membrane vessel filling animation with wavy water flow">
@@ -2103,6 +2111,30 @@
 
 .pace-loader--overlay.is-active{
   display:flex !important;
+}
+
+/* Pretreatment Step Styling */
+.pretreatment-step {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.6rem;
+  padding: 0.8rem 1rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+}
+[data-theme="dark"] .pretreatment-step {
+  background: rgba(255, 255, 255, 0.03);
+}
+.pretreatment-step i {
+  color: var(--primary-color);
+  font-size: 1.1rem;
+  min-width: 1.5rem;
+  text-align: center;
+}
+.pretreatment-step:last-child {
+  margin-bottom: 0;
 }
 </style>
 

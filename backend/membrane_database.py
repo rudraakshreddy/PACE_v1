@@ -890,7 +890,10 @@ class MembraneDatabase:
             "backwash_duration_s": 45,
             "air_scour_flow_m3h": 12.0,
             "min_forward_flush_m3h": 1.5,
-            "permeability_Lp20": 400.0 # LMH/bar at 20C (clean)
+            "permeability_Lp20": 400.0, # LMH/bar at 20C (clean)
+            "unit_cost_inr": 120000.0,  # per module (80 m² housing + fiber bundle)
+            "feed_pump_kw_per_module": 0.75, # typical feed pump power
+            "backwash_pump_kw_per_module": 1.10, # BW pump power
         },
         "SFP-2860": {
             "type": "UF",
@@ -906,9 +909,13 @@ class MembraneDatabase:
             "backwash_duration_s": 45,
             "air_scour_flow_m3h": 8.0,
             "min_forward_flush_m3h": 1.0,
-            "permeability_Lp20": 350.0
+            "permeability_Lp20": 350.0,
+            "unit_cost_inr": 85000.0,   # per module (51 m² housing + fiber bundle)
+            "feed_pump_kw_per_module": 0.55,
+            "backwash_pump_kw_per_module": 0.80,
         }
     }
+
 
     @classmethod
     def get_ro_membrane(cls, name: str) -> Dict[str, Any]:

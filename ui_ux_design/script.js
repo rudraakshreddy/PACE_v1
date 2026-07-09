@@ -1,27 +1,12 @@
-const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
+const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : 'http://127.0.0.1:8000';
 window.isProjectDirty = false;
 
 window.showLoader = function() {
     const loader = document.getElementById('global-loader');
     if (loader) {
         loader.classList.add('is-active');
-        
-        // Center the loader container horizontally over the active content area
-        const activeDashboard = document.querySelector('.dashboard:not([style*="display: none"])');
         const loaderContainer = loader.querySelector('.pace-loader');
-        if (activeDashboard && loaderContainer) {
-            const style = window.getComputedStyle(activeDashboard);
-            const gridTemplate = style.getPropertyValue('grid-template-columns');
-            if (gridTemplate && gridTemplate.includes('350px')) {
-                // Shift right by 175px to offset the 350px left sidebar
-                loaderContainer.style.transform = 'translateX(175px)';
-            } else if (gridTemplate && gridTemplate.includes('450px')) {
-                // Shift left by 225px to offset the 450px right sidebar
-                loaderContainer.style.transform = 'translateX(-225px)';
-            } else {
-                loaderContainer.style.transform = 'none';
-            }
-        } else if (loaderContainer) {
+        if (loaderContainer) {
             loaderContainer.style.transform = 'none';
         }
     }
@@ -1807,7 +1792,7 @@ async function fetchMembraneRecommendation() {
             target_flow_m3h: safeInputVal('flow', 50.0),
             target_recovery_pct: document.getElementById('calc-target-recovery') ? safeInputVal('calc-target-recovery', 75.0) : safeInputVal('recovery', 75.0),
             target_tds: document.getElementById('target-tds') ? safeInputVal('target-tds', 50.0) : safeInputVal('rec-target-tds', 50.0),
-            source_type: document.getElementById('water-type') ? document.getElementById('water-type').value.toUpperCase() : 'LOW_TDS',
+            source_type: document.getElementById('water-type') && document.getElementById('water-type').selectedIndex !== -1 ? (document.getElementById('water-type').options[document.getElementById('water-type').selectedIndex].getAttribute('data-source-type') || 'LOW_TDS') : 'LOW_TDS',
             ro_membrane: 'placeholder',
             stages: safeInputVal('calc-stages', 2),
             vessels_per_stage: vessels,
@@ -2064,7 +2049,7 @@ window.renderActiveRecommendation = function() {
             <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
                 ${recommendations.map((r, i) => `
                     <div onclick="window.currentRecommendationIndex = ${i}; window.renderActiveRecommendation();" 
-                         style="width: 8px; height: 8px; border-radius: 50%; background: ${i === index ? 'var(--accent-color)' : 'rgba(255,255,255,0.2)'}; 
+                         style="width: 8px; height: 8px; border-radius: 50%; background: ${i === index ? 'var(--accent-color)' : 'rgba(0,0,0,0.2)'}; 
                                 cursor: pointer; transition: var(--transition);" 
                          title="${r.model}"></div>
                 `).join('')}
@@ -2073,24 +2058,24 @@ window.renderActiveRecommendation = function() {
     }
 
     const navigationControls = recommendations.length > 1 ? `
-        <button onclick="window.prevRecommendation();" class="carousel-nav-btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--text-primary); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
+        <button onclick="window.prevRecommendation();" class="carousel-nav-btn" style="background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.1); color: var(--text-color); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
             <i class="fa-solid fa-chevron-left"></i>
         </button>
         <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); min-width: 90px; text-align: center;">
             ${index + 1} of ${recommendations.length}
         </span>
-        <button onclick="window.nextRecommendation();" class="carousel-nav-btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: var(--text-primary); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
+        <button onclick="window.nextRecommendation();" class="carousel-nav-btn" style="background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.1); color: var(--text-color); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition);">
             <i class="fa-solid fa-chevron-right"></i>
         </button>
     ` : '';
 
     candidatesContainer.innerHTML = `
-        <div class="carousel-outer" style="display: flex; flex-direction: column; gap: 0.6rem; width: 100%; position: relative; flex-grow: 1; height: 100%; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 0.6rem; width: 100%; flex-grow: 1;">
+        <div class="carousel-outer" style="display: flex; flex-direction: column; gap: 0.6rem; width: 100%; position: relative; justify-content: space-between;">
+            <div style="display: flex; align-items: stretch; gap: 0.6rem; width: 100%;">
                 
                 <!-- Slide Container with transitions -->
-                <div class="carousel-slide-container" style="flex-grow: 1; min-width: 0; transition: transform 0.3s ease, opacity 0.3s ease; opacity: 1; height: 100%; display: flex; flex-direction: column;" id="active-candidate-slide">
-                    <div class="candidate-card ${isBest ? 'is-best' : ''}">
+                <div class="carousel-slide-container" style="width: 100%; min-width: 0; transition: transform 0.3s ease, opacity 0.3s ease; opacity: 1; display: flex; flex-direction: column;" id="active-candidate-slide">
+                    <div class="candidate-card ${isBest ? 'is-best' : ''}" style="box-sizing: border-box; width: 100%; background: linear-gradient(135deg, #1e40af, #3b82f6); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 4px 20px rgba(30, 64, 175, 0.25); border-radius: 8px; padding: 1.2rem; display: flex; flex-direction: column;">
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <div style="display: flex; align-items: center; gap: 0.8rem;">
                                 <div class="model-name" style="font-size: 1.3rem; font-weight: 800; color: #ffffff; font-family: 'Inter', sans-serif;">
@@ -2108,13 +2093,13 @@ window.renderActiveRecommendation = function() {
                             </div>
                         </div>
                         
-                        <div class="metrics-text" style="font-size: 0.82rem; color: #bfdbfe; line-height: 1.35; border-left: 2px solid ${scoreColor}; padding-left: 0.7rem; margin: 0;">
+                        <div class="metrics-text" style="font-size: 0.82rem; color: #bfdbfe; line-height: 1.35; border-left: 2px solid ${scoreColor}; padding-left: 0.7rem; margin: 0.8rem 0;">
                             Permeate TDS: <b style="color:#ffffff;">${rec.calculated_metrics.permeate_tds} mg/L</b> | Energy: <b style="color:#ffffff;">${rec.calculated_metrics.specific_energy} kWh/m³</b><br>
-                            Feed Pressure: <b>${rec.calculated_metrics.feed_pressure_bar} bar</b> | Max CP (\u03B2): <b>${rec.max_beta ? rec.max_beta.toFixed(2) : '1.00'}</b>
+                            Feed Pressure: <b style="color:#ffffff;">${rec.calculated_metrics.feed_pressure_bar} bar</b> | Max CP (\u03B2): <b style="color:#ffffff;">${rec.max_beta ? rec.max_beta.toFixed(2) : '1.00'}</b>
                         </div>
                         
                         <!-- Details Panel -->
-                        <div style="display: flex; flex-direction: column; gap: 0.7rem; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 0.7rem; margin-top: 0.3rem;">
+                        <div style="display: flex; flex-direction: column; gap: 0.7rem; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 0.7rem; margin-top: auto;">
                             <!-- DQ Banner if disqualified -->
                             ${isDQ ? `
                             <div style="background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); color: #fee2e2; padding: 0.6rem; border-radius: 4px; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
@@ -2148,7 +2133,7 @@ window.renderActiveRecommendation = function() {
             
             <!-- Bottom Controls (Chevrons + Dots) -->
             ${recommendations.length > 1 ? `
-                <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem; margin-top: 0.5rem; width: 100%;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 0.5rem; margin-top: 0.5rem; width: 100%;">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         ${navigationControls}
                     </div>
@@ -3661,6 +3646,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const ufGroup = document.getElementById('calc-uf-module-group');
             if (ufGroup) ufGroup.style.display = train.includes('UF') ? 'block' : 'none';
 
+            // ── Show / hide UF economic parameters row ───────────────────────
+            const ufEcoRow = document.getElementById('eco-uf-params-row');
+            if (ufEcoRow) {
+                ufEcoRow.style.display = train.includes('UF') ? 'grid' : 'none';
+                // Set default UF module cost from the selected UF module
+                if (train.includes('UF')) {
+                    const ufModSel = document.getElementById('calc-uf-module');
+                    const ufModCostEl = document.getElementById('eco-uf-mod-cost');
+                    if (ufModSel && ufModCostEl) {
+                        const ufModCosts = { 'IntegraTec-SFD-2880': 120000, 'SFP-2860': 85000 };
+                        ufModCostEl.value = ufModCosts[ufModSel.value] || 120000;
+                    }
+                }
+            }
+
             // ── Show / hide Pass 2 container ────────────────────────────────
             const pass2Container = document.getElementById('calc-pass2-container');
             if (pass2Container) pass2Container.style.display = train.includes('2P-RO') ? 'block' : 'none';
@@ -3830,7 +3830,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     uf_module: document.getElementById('calc-tech-train').value.includes('UF') ? document.getElementById('calc-uf-module').value : null,
                     stages: parseInt(document.getElementById('calc-stages').value) || 2,
                     vessels_per_stage: vessels,
-                    elements_per_vessel: parseInt(document.getElementById('calc-elements-pv').value) || 6
+                    elements_per_vessel: parseInt(document.getElementById('calc-elements-pv').value) || 6,
+                    source_type: document.getElementById('water-type') && document.getElementById('water-type').selectedIndex !== -1 ? (document.getElementById('water-type').options[document.getElementById('water-type').selectedIndex].getAttribute('data-source-type') || 'LOW_TDS') : 'LOW_TDS'
                 };
 
                 console.log('[AutoSelect] Sending payload:', JSON.stringify(payload));
@@ -4100,7 +4101,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         membrane_lifetime: safeVal('eco-mem-life', 5),
                         plant_availability: safeVal('eco-avail', 90) / 100,
                         discount_rate: 0.10,
-                        project_life: 20
+                        project_life: 20,
+                        uf_module_cost: safeVal('eco-uf-mod-cost', 120000),
+                        uf_membrane_lifetime: safeVal('eco-uf-mem-life', 7)
                     }
                 };
 
@@ -4168,7 +4171,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const physSubtabBtn = document.getElementById('calc-subtab-physics');
                 if (physSubtabBtn) {
-                    physSubtabBtn.style.display = isPhysics ? 'block' : 'none';
+                    // Always keep the tab visible so the user can revert back to it
+                    physSubtabBtn.style.display = 'inline-flex';
                 }
 
                 if (isPhysics && data.physics_results) {
@@ -4229,10 +4233,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     setEco('eco-capex-cont',  formatINR(eco.capex.contingency_inr));
                     setEco('eco-capex-total', formatINR(eco.capex.total_capex_inr));
 
+                    // Show/hide UF CAPEX rows
+                    const ufModCost = eco.capex.uf_modules_inr || 0;
+                    const ufPumpCost = eco.capex.uf_pumps_inr || 0;
+                    const ufModRow  = document.getElementById('eco-capex-uf-mod-row');
+                    const ufPumpRow = document.getElementById('eco-capex-uf-pump-row');
+                    if (ufModRow)  ufModRow.style.display  = ufModCost  > 0 ? 'table-row' : 'none';
+                    if (ufPumpRow) ufPumpRow.style.display = ufPumpCost > 0 ? 'table-row' : 'none';
+                    if (ufModCost  > 0) setEco('eco-capex-uf-mod',  formatINR(ufModCost)  + (eco.capex.uf_modules_count ? ` (${eco.capex.uf_modules_count} modules)` : ''));
+                    if (ufPumpCost > 0) setEco('eco-capex-uf-pump', formatINR(ufPumpCost));
+
                     // OPEX
                     setEco('eco-opex-energy', formatINR(eco.opex.energy_cost_pa_inr));
-                    setEco('eco-opex-mem',    formatINR(eco.opex.membrane_repl_pa_inr));
+                    // Show RO-only membrane replacement in its row
+                    setEco('eco-opex-mem',    formatINR(eco.opex.ro_mem_repl_pa_inr !== undefined
+                                                        ? eco.opex.ro_mem_repl_pa_inr
+                                                        : eco.opex.membrane_repl_pa_inr));
                     setEco('eco-opex-total',  formatINR(eco.opex.total_opex_pa_inr));
+
+                    // Show/hide UF Module Replacement row
+                    const ufMemRepl = eco.opex.uf_mem_repl_pa_inr || 0;
+                    const ufMemReplRow = document.getElementById('eco-opex-uf-mem-row');
+                    if (ufMemReplRow) ufMemReplRow.style.display = ufMemRepl > 0 ? 'table-row' : 'none';
+                    if (ufMemRepl > 0) setEco('eco-opex-uf-mem', formatINR(ufMemRepl));
+
+                    // Show/hide UF OPEX CEB chemicals row
+                    const ufChemCost = eco.opex.uf_ceb_chemicals_pa_inr || 0;
+                    const ufChemRow  = document.getElementById('eco-opex-uf-chem-row');
+                    if (ufChemRow) ufChemRow.style.display = ufChemCost > 0 ? 'table-row' : 'none';
+                    if (ufChemCost > 0) setEco('eco-opex-uf-chem', formatINR(ufChemCost));
 
                     // Unit Cost
                     setEco('eco-metrics-kl',       new Intl.NumberFormat('en-IN').format(eco.metrics.annual_production_kl));
@@ -4443,13 +4472,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // ── Render PHREEQC Concentrate Scaling Risks ──────────────
                     const siCard  = results.querySelector('#calc-si-card');
                     const siTbody = results.querySelector('#calc-si-tbody');
-                    const siPhEl  = results.querySelector('#calc-conc-ph');
                     const siData  = data.concentrate_si;
                     const siPh   = data.concentrate_ph;
 
                     if (siData && siCard) {
                         siCard.style.display = 'block';
-                        if (siPhEl) siPhEl.textContent = siPh != null ? siPh.toFixed(2) : '—';
 
                         // Thresholds: { mod, high, crit } — lower bound triggers each tier
                         const SI_LIMITS = {
@@ -4488,10 +4515,23 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <tr>
                                     <td style="text-align:left; font-weight:600;">${mineral}</td>
                                     <td style="color:var(--text-secondary); font-size:0.8rem;">${lim.formula}</td>
-                                    <td style="font-family:monospace; font-weight:700; color:${siVal > 0 ? (risk === 'CRITICAL' ? '#ef4444' : risk === 'HIGH' ? '#f97316' : '#f59e0b') : 'var(--text-secondary)'};">${siVal.toFixed(3)}</td>
-                                    <td><span style="padding:0.2rem 0.6rem; border-radius:4px; font-size:0.72rem; font-weight:700; background:${rs.bg}; color:${rs.color};">${rs.label}</span></td>
+                                    <td style="font-weight:700; color:${siVal > 0 ? (risk === 'CRITICAL' ? '#ef4444' : risk === 'HIGH' ? '#f97316' : '#f59e0b') : 'var(--text-secondary)'};">${siVal.toFixed(3)}</td>
+                                    <td><span style="font-size:0.72rem; font-weight:700; color:${rs.color};">${rs.label}</span></td>
                                 </tr>`;
                         }
+
+                        // Add Concentrate pH row at the bottom
+                        if (siPh != null) {
+                            siHtml += `
+                                <tr>
+                                    <td style="text-align:left; font-weight:600; padding-top: 1rem;">Concentrate pH</td>
+                                    <td style="color:var(--text-secondary); font-size:0.8rem; padding-top: 1rem;">Equilibrium H⁺</td>
+                                    <td style="font-weight:700; color:var(--text-secondary); padding-top: 1rem;">${siPh.toFixed(2)}</td>
+                                    <td style="padding-top: 1rem;"><span style="font-size:0.72rem; font-weight:700; color:#3b82f6;">Computed</span></td>
+                                </tr>
+                            `;
+                        }
+
                         if (siTbody) siTbody.innerHTML = siHtml;
                     } else {
                         if (siCard) siCard.style.display = 'none';
@@ -4501,6 +4541,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     let allWarnings = [];
                     if (data.uf_results && data.uf_results.warnings) allWarnings = allWarnings.concat(data.uf_results.warnings);
                     if (data.ro_results && data.ro_results.warnings) allWarnings = allWarnings.concat(data.ro_results.warnings);
+                    allWarnings = allWarnings.filter(w => !w.type || !w.type.includes('Concentration Polarization'));
                     
                     const warnCard = results.querySelector('#calc-warnings-card');
                     const warnBody = results.querySelector('#calc-warnings-tbody');
@@ -4523,7 +4564,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             `;
                         }).join('');
                     } else {
-                        if (warnCard) warnCard.style.display = 'none';
+                        if (warnCard) warnCard.style.display = 'flex';
+                        if (warnBody) warnBody.innerHTML = `
+                            <tr>
+                                <td colspan="4" style="text-align:center; color:var(--success-color); padding: 1.5rem; font-weight: 500;">
+                                    <i class="fa-solid fa-check-circle" style="margin-right: 0.5rem;"></i> No design warnings
+                                </td>
+                            </tr>
+                        `;
                     }
                 }
                 
@@ -4627,7 +4675,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (genReportBtn) {
         genReportBtn.addEventListener('click', async () => {
-            if (!window.lastCalcPayload) return;
+            if (!window.lastCalcPayload) {
+                alert("Please run a system calculation first before generating a report.");
+                return;
+            }
             
             const btnOriginalText = genReportBtn.innerHTML;
             genReportBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Generating...';
@@ -4675,10 +4726,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Filter out Concentration Polarization warnings from the report payload
+                const payloadClone = JSON.parse(JSON.stringify(window.lastCalcPayload));
+                if (payloadClone.ro_results && payloadClone.ro_results.warnings) {
+                    payloadClone.ro_results.warnings = payloadClone.ro_results.warnings.filter(w => 
+                        !w.type || !w.type.includes('Concentration Polarization')
+                    );
+                }
+                
                 const res = await fetch(API_BASE + '/api/generate-calculation-report', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(window.lastCalcPayload)
+                    body: JSON.stringify(payloadClone)
                 });
                 
                 if (!res.ok) {

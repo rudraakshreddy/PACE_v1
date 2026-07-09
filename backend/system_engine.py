@@ -418,7 +418,53 @@ class SystemEngine:
                 c_hp_pump = hp_kw * pump_cost_kw
                 c_bp_pump = bp_kw * pump_cost_kw
                 
-                c_equip_sub = c_membranes + c_vessels + c_hp_pump + c_bp_pump
+                # --- UF CAPEX/OPEX (added when UF train selected) ---
+                c_uf_modules = 0.0
+                c_uf_pumps = 0.0
+                uf_energy_cost_pa = 0.0
+                uf_mem_repl_pa = 0.0
+                uf_chem_cost_pa = 0.0
+                uf_capex_breakdown = {}
+                
+                uf_res = result.get("uf_results")
+                if uf_res:
+                    uf_mod_name = input_data.get("uf_module", "IntegraTec-SFD-2880")
+                    uf_mod = MembraneDatabase.get_uf_module(uf_mod_name)
+                    n_uf_modules = uf_res["overview"]["total_modules"]
+                    
+                    # CAPEX: UF modules + UF pumps
+                    # Use user-specified cost if provided, else fall back to database default
+                    uf_unit_cost = eco_params.get("uf_module_cost", uf_mod.get("unit_cost_inr", 120000.0))
+                    c_uf_modules = n_uf_modules * uf_unit_cost
+                    
+                    uf_feed_kw = uf_mod.get("feed_pump_kw_per_module", 0.75) * n_uf_modules
+                    uf_bw_kw   = uf_mod.get("backwash_pump_kw_per_module", 1.10) * n_uf_modules
+                    c_uf_pumps = (uf_feed_kw + uf_bw_kw) * pump_cost_kw
+                    
+                    # OPEX: UF energy (feed + BW pumps), CEB chemicals, UF membrane replacement
+                    avail_uf = eco_params.get("plant_availability", 0.90)
+                    hours_pa_uf = avail_uf * 8760.0
+                    tariff = eco_params.get("electricity_tariff", 7.50)
+                    uf_energy_cost_pa = (uf_feed_kw + uf_bw_kw) * hours_pa_uf * tariff
+                    
+                    # CEB chemicals: ~7 g per m³ of net UF permeate (citric acid + NaOCl blended)
+                    # Industry practice: dilute CEB ~2x per week, ~200 mg/L NaOCl + 2000 mg/L citric acid
+                    # Effective dose blended across production volume ≈ 0.007 kg/m³ net permeate
+                    net_uf_flow_m3h = uf_res["overview"]["net_product_m3h"]
+                    ceb_kg_pa = 0.007 * net_uf_flow_m3h * hours_pa_uf   # 7 g/m³ net permeate
+                    uf_chem_cost_pa = ceb_kg_pa * 30.0                   # ₹30/kg average CEB chemical cost
+                    
+                    # UF module replacement: ~7 year life
+                    uf_mem_life = eco_params.get("uf_membrane_lifetime", 7.0)
+                    uf_mem_repl_pa = c_uf_modules / uf_mem_life if uf_mem_life > 0 else 0.0
+                    
+                    uf_capex_breakdown = {
+                        "uf_modules_inr": round(c_uf_modules, 2),
+                        "uf_pumps_inr": round(c_uf_pumps, 2),
+                        "uf_modules_count": n_uf_modules,
+                    }
+
+                c_equip_sub = c_membranes + c_vessels + c_hp_pump + c_bp_pump + c_uf_modules + c_uf_pumps
                 
                 ic_factor = eco_params.get("ic_factor", 0.15)
                 c_ic = c_equip_sub * ic_factor
@@ -434,12 +480,14 @@ class SystemEngine:
                 
                 total_kw = summary.get("total_power_kw", 0.0)
                 tariff = eco_params.get("electricity_tariff", 7.50)
-                energy_cost_pa = total_kw * hours_pa * tariff
+                energy_cost_pa = total_kw * hours_pa * tariff + uf_energy_cost_pa
                 
                 mem_life = eco_params.get("membrane_lifetime", 5.0)
-                mem_repl_pa = c_membranes / mem_life if mem_life > 0 else 0
+                ro_mem_repl_pa = c_membranes / mem_life if mem_life > 0 else 0
+                # uf_mem_repl_pa already computed above (0.0 when no UF)
+                total_mem_repl_pa = ro_mem_repl_pa + uf_mem_repl_pa
                 
-                total_opex_pa = energy_cost_pa + mem_repl_pa
+                total_opex_pa = energy_cost_pa + total_mem_repl_pa + uf_chem_cost_pa
                 
                 # Cost per KL
                 discount_rate = eco_params.get("discount_rate", 0.10)
@@ -463,6 +511,7 @@ class SystemEngine:
                         "vessels_inr": round(c_vessels, 2),
                         "hp_pump_inr": round(c_hp_pump, 2),
                         "booster_pump_inr": round(c_bp_pump, 2),
+                        **uf_capex_breakdown,
                         "equip_subtotal_inr": round(c_equip_sub, 2),
                         "ic_inr": round(c_ic, 2),
                         "contingency_inr": round(c_contingency, 2),
@@ -471,7 +520,10 @@ class SystemEngine:
                     "opex": {
                         "annual_hours": round(hours_pa, 0),
                         "energy_cost_pa_inr": round(energy_cost_pa, 2),
-                        "membrane_repl_pa_inr": round(mem_repl_pa, 2),
+                        "ro_mem_repl_pa_inr": round(ro_mem_repl_pa, 2),
+                        "uf_mem_repl_pa_inr": round(uf_mem_repl_pa, 2),
+                        "membrane_repl_pa_inr": round(total_mem_repl_pa, 2),  # kept for backward compat
+                        "uf_ceb_chemicals_pa_inr": round(uf_chem_cost_pa, 2),
                         "total_opex_pa_inr": round(total_opex_pa, 2)
                     },
                     "metrics": {
@@ -482,6 +534,7 @@ class SystemEngine:
                         "cost_per_kl_inr": round(cost_per_kl, 2)
                     }
                 }
+
         result["ro_membrane"] = input_data.get("ro_membrane", "BW30-400")
         result["uf_module"] = input_data.get("uf_module", "IntegraTec-SFD-2880")
         result["stages_count"] = input_data.get("stages", 2)
@@ -879,15 +932,22 @@ class SystemEngine:
         bp_kw = p1_res["summary"]["booster_pump_power_kw"] + p2_res["summary"]["booster_pump_power_kw"]
         
         pump_cost_kw = eco_params.get("pump_cost_kw", 96000.0)
-        c_pumps = (hp_kw + bp_kw) * pump_cost_kw
+        c_hp_pump = hp_kw * pump_cost_kw
+        c_bp_pump = bp_kw * pump_cost_kw
         
-        c_equip_sub = c_membranes + c_vessels + c_pumps
-        c_ic = c_equip_sub * eco_params.get("ic_factor", 0.15)
-        total_capex = c_equip_sub + c_ic + ((c_equip_sub + c_ic) * eco_params.get("contingency_factor", 0.10))
+        c_equip_sub = c_membranes + c_vessels + c_hp_pump + c_bp_pump
+        ic_factor = eco_params.get("ic_factor", 0.15)
+        contingency_factor = eco_params.get("contingency_factor", 0.10)
+        c_ic = c_equip_sub * ic_factor
+        c_contingency = (c_equip_sub + c_ic) * contingency_factor
+        total_capex = c_equip_sub + c_ic + c_contingency
         
-        hours_pa = eco_params.get("plant_availability", 0.90) * 8760.0
-        energy_cost_pa = (hp_kw + bp_kw) * hours_pa * eco_params.get("electricity_tariff", 7.50)
-        mem_repl_pa = c_membranes / eco_params.get("membrane_lifetime", 5.0)
+        avail = eco_params.get("plant_availability", 0.90)
+        hours_pa = avail * 8760.0
+        tariff = eco_params.get("electricity_tariff", 7.50)
+        energy_cost_pa = (hp_kw + bp_kw) * hours_pa * tariff
+        mem_life = eco_params.get("membrane_lifetime", 5.0)
+        mem_repl_pa = c_membranes / mem_life if mem_life > 0 else 0.0
         
         chem_kg_pa = (cond_dose / 1000.0) * p1_perm_flow * hours_pa
         chem_cost_pa = chem_kg_pa * 20.0
@@ -897,31 +957,36 @@ class SystemEngine:
         discount = eco_params.get("discount_rate", 0.10)
         life = eco_params.get("project_life", 20.0)
         crf = (discount * ((1 + discount)**life)) / (((1 + discount)**life) - 1) if discount > 0 else 0
-        annual_capex = total_capex * crf
-        total_annual = annual_capex + total_opex_pa
+        annualised_capex = total_capex * crf
+        total_annual = annualised_capex + total_opex_pa
         
         q_annual = p2_res["summary"]["perm_flow"] * hours_pa
+        cost_per_kl = total_annual / q_annual if q_annual > 0 else 0
         
         return {
+            "unit_membrane_cost_inr": mem1_price,
             "capex": {
                 "membranes_inr": round(c_membranes, 2),
                 "vessels_inr": round(c_vessels, 2),
-                "hp_pump_inr": round(hp_kw * pump_cost_kw, 2),
-                "booster_pump_inr": round(bp_kw * pump_cost_kw, 2),
+                "hp_pump_inr": round(c_hp_pump, 2),
+                "booster_pump_inr": round(c_bp_pump, 2),
                 "equip_subtotal_inr": round(c_equip_sub, 2),
                 "ic_inr": round(c_ic, 2),
-                "contingency_inr": round((c_equip_sub + c_ic) * eco_params.get("contingency_factor", 0.10), 2),
+                "contingency_inr": round(c_contingency, 2),
                 "total_capex_inr": round(total_capex, 2)
             },
             "opex": {
+                "annual_hours": round(hours_pa, 0),
                 "energy_cost_pa_inr": round(energy_cost_pa, 2),
                 "membrane_repl_pa_inr": round(mem_repl_pa, 2),
                 "chemical_cost_pa_inr": round(chem_cost_pa, 2),
                 "total_opex_pa_inr": round(total_opex_pa, 2)
             },
             "metrics": {
+                "crf": round(crf, 4),
+                "annualised_capex_inr": round(annualised_capex, 2),
                 "annual_production_kl": round(q_annual, 2),
                 "total_annual_cost_inr": round(total_annual, 2),
-                "cost_per_kl_inr": round(total_annual / q_annual, 2) if q_annual > 0 else 0
+                "cost_per_kl_inr": round(cost_per_kl, 2)
             }
         }
