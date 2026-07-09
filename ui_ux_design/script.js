@@ -4419,7 +4419,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Render Booster Pumps
                     const bpCard = results.querySelector('#calc-booster-pumps-card');
                     const tbodyBP = results.querySelector('#calc-booster-pumps-tbody');
-                    if (data.ro_results.booster_pumps && data.ro_results.booster_pumps.length > 0) {
+                    if (data.ro_results && data.ro_results.booster_pumps && data.ro_results.booster_pumps.length > 0) {
                         const requiredPumps = data.ro_results.booster_pumps.filter(bp => bp.required);
                         if (requiredPumps.length > 0) {
                             if (bpCard) bpCard.style.display = 'block';
@@ -4443,10 +4443,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const tbodyIon = results.querySelector('#calc-ion-tbody');
                     let ionsHtml = '';
                     const ionMap = { 'Ca': 'calcium', 'Mg': 'magnesium', 'Na': 'sodium', 'K': 'potassium', 'Ba': 'barium', 'Sr': 'strontium', 'Cl': 'chloride', 'SO4': 'sulfate', 'HCO3': 'bicarbonate', 'NO3': 'nitrate', 'F': 'fluoride', 'SiO2': 'silica', 'B': 'boron', 'PO4': 'phosphate', 'NH4': 'ammonium', 'Al': 'aluminium', 'Fe': 'iron', 'Mn': 'manganese' };
-                    for (const [ion, feedC] of Object.entries(roSum.conc_ions)) { // just to get keys
-                        const f = roSum.feed_tds > 0 ? (payload.feed_water[ionMap[ion]] || 0) : 0;
-                        let p = roSum.perm_ions[ion] || 0;
-                        let c = roSum.conc_ions[ion] || 0;
+                    
+                    let activeRes = data.ro_results || data.pass2_results || data.pass1_results;
+                    let activeSum = activeRes ? activeRes.summary : null;
+                    
+                    if (activeSum && activeSum.conc_ions) {
+                        for (const [ion, feedC] of Object.entries(activeSum.conc_ions)) { // just to get keys
+                            const f = activeSum.feed_tds > 0 ? (payload.feed_water[ionMap[ion]] || 0) : 0;
+                            let p = activeSum.perm_ions[ion] || 0;
+                            let c = activeSum.conc_ions[ion] || 0;
                         let rej = 0;
                         if (f > 0) {
                             rej = (1 - (p / f)) * 100;
@@ -4466,6 +4471,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <td>${rej.toFixed(2)}</td>
                             </tr>
                         `;
+                        }
                     }
                     if (tbodyIon) tbodyIon.innerHTML = ionsHtml;
 
