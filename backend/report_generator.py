@@ -47,6 +47,45 @@ plt.rcParams.update({
 # XML / docx helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _set_cell_bg(cell, color_hex):
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    tcPr = cell._element.get_or_add_tcPr()
+    shading = OxmlElement('w:shd')
+    shading.set(qn('w:fill'), color_hex)
+    tcPr.append(shading)
+
+def conv_flow(val, units_dict):
+    to_unit = units_dict.get('flow', 'm3/h')
+    if to_unit == 'm3/d': return val * 24.0
+    if to_unit == 'gpm': return val * 4.40287
+    if to_unit == 'gpd': return val * 6340.13
+    return val
+
+def conv_press(val, units_dict):
+    to_unit = units_dict.get('pressure', 'bar')
+    if to_unit == 'psi': return val * 14.5038
+    if to_unit == 'MPa': return val * 0.1
+    if to_unit == 'kPa': return val * 100.0
+    return val
+
+def conv_flux(val, units_dict):
+    to_unit = units_dict.get('flux', 'LMH')
+    if to_unit == 'GFD': return val * 0.589
+    return val
+
+def lbl_flow(units_dict):
+    u = units_dict.get('flow', 'm3/h')
+    if u == 'm3/h': return 'm³/h'
+    if u == 'm3/d': return 'm³/d'
+    return u
+
+def lbl_press(units_dict):
+    return units_dict.get('pressure', 'bar')
+
+def lbl_flux(units_dict):
+    return units_dict.get('flux', 'LMH')
+
 def _set_cell_border(cell, **kw):
     tc   = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -223,6 +262,36 @@ def _chart_dual_profile(elements, title, y1_key, y2_key, y1_label, y2_label,
     labels = [y1_label, y2_label]
     ax1.legend(lines, labels, fontsize=7, loc='upper right')
     ax1.spines['top'].set_visible(False)
+    fig.tight_layout()
+    return _chart_bytes(fig)
+
+def _chart_dual_profile_manual(elements, y1s, y2s, title, y1_label, y2_label, figsize=(5.5, 2.6)):
+    """Dual-axis line chart with manually scaled values."""
+    xs  = [f"S{e['stage']}-E{e['position']}" for e in elements]
+    fig, ax1 = plt.subplots(figsize=figsize)
+    ax2 = ax1.twinx()
+    ax1.plot(xs, y1s, marker='o', color=CHART_BRAND, linewidth=1.8, markersize=4, label=y1_label)
+    ax2.plot(xs, y2s, marker='s', color=CHART_ORANGE,  linewidth=1.8, markersize=4, label=y2_label)
+    ax1.set_title(title); ax1.set_ylabel(y1_label, color=CHART_BRAND)
+    ax2.set_ylabel(y2_label, color=CHART_ORANGE)
+    ax1.set_xticks(range(len(xs))); ax1.set_xticklabels(xs, rotation=45, ha='right', fontsize=7)
+    lines  = ax1.get_lines() + ax2.get_lines()
+    labels = [y1_label, y2_label]
+    ax1.legend(lines, labels, fontsize=7, loc='upper right')
+    ax1.spines['top'].set_visible(False)
+    fig.tight_layout()
+    return _chart_bytes(fig)
+
+def _chart_element_profile_manual(elements, ys, title, y_label, color, figsize=(3.0, 2.5)):
+    """Single-axis line chart with manually scaled values."""
+    xs  = [f"S{e['stage']}-E{e['position']}" for e in elements]
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(xs, ys, marker='o', color=color, linewidth=1.8, markersize=4)
+    ax.set_title(title, fontsize=8)
+    ax.set_ylabel(y_label, fontsize=7, color=color)
+    ax.set_xticks(range(len(xs))); ax.set_xticklabels(xs, rotation=45, ha='right', fontsize=6)
+    ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
+    ax.tick_params(axis='both', which='major', labelsize=6)
     fig.tight_layout()
     return _chart_bytes(fig)
 
@@ -755,14 +824,19 @@ class ReportGenerator:
         ro_main = sr.get('pass1_results') or sr.get('ro_results') or {}
         sm  = ro_main.get('summary', {})
         rec = sm.get('total_recovery', 0) * 100
+        ud = sr.get('units', {})
+        flow_lbl = lbl_flow(ud)
+        press_lbl = lbl_press(ud)
+        flux_lbl = lbl_flux(ud)
+
         _heading(doc, 'RO Flow Table (Stream Level)')
         _data_table(doc,
-            [['#', 'Description', 'Flow (m³/h)', 'TDS (mg/L)', 'Pressure (bar)']],
+            [['#', 'Description', f'Flow ({flow_lbl})', 'TDS (mg/L)', f'Pressure ({press_lbl})']],
             [
-                ['1', 'Raw Feed to RO System',           f"{sr.get('target_flow_m3h', sm.get('feed_flow', 0)):.1f}",  f"{sm.get('feed_tds', 0):.1f}", '0.0'],
-                ['2', 'Net Feed to Pass 1',               f"{sm.get('feed_flow', 0):.1f}",  f"{sm.get('feed_tds', 0):.1f}", f"{sm.get('feed_pressure_bar', 0):.1f}"],
-                ['4', 'Total Concentrate from Pass 1',    f"{sm.get('conc_flow', 0):.1f}",  f"{sm.get('conc_tds', 0):.0f}", '—'],
-                ['6', 'Net Product from RO System',       f"{sm.get('perm_flow', 0):.1f}",  f"{sm.get('perm_tds', 0):.2f}", '0.0'],
+                ['1', 'Raw Feed to RO System',           f"{conv_flow(sr.get('target_flow_m3h', sm.get('feed_flow', 0)), ud):.1f}",  f"{sm.get('feed_tds', 0):.1f}", '0.0'],
+                ['2', 'Net Feed to Pass 1',               f"{conv_flow(sm.get('feed_flow', 0), ud):.1f}",  f"{sm.get('feed_tds', 0):.1f}", f"{conv_press(sm.get('feed_pressure_bar', 0), ud):.1f}"],
+                ['4', 'Total Concentrate from Pass 1',    f"{conv_flow(sm.get('conc_flow', 0), ud):.1f}",  f"{sm.get('conc_tds', 0):.0f}", '—'],
+                ['6', 'Net Product from RO System',       f"{conv_flow(sm.get('perm_flow', 0), ud):.1f}",  f"{sm.get('perm_tds', 0):.2f}", '0.0'],
             ],
             col_widths=[0.7, 6.5, 2.5, 2.5, 2.2]
         )
@@ -777,8 +851,8 @@ class ReportGenerator:
         tbl_top = doc.add_table(rows=2, cols=6)
         top_data = [
             ['Total # of Units', '1', 'Online =', '1', 'Standby =', '0'],
-            ['RO Recovery', f'{rec:.1f} %', 'System Flow Rate', f"{sr.get('target_flow_m3h', 0):.1f} m³/h",
-             'Net Product', f"{sm.get('perm_flow', 0):.1f} m³/h"],
+            ['RO Recovery', f'{rec:.1f} %', 'System Flow Rate', f"{conv_flow(sr.get('target_flow_m3h', 0), ud):.1f} {flow_lbl}",
+             'Net Product', f"{conv_flow(sm.get('perm_flow', 0), ud):.1f} {flow_lbl}"],
         ]
         for ri, row in enumerate(top_data):
             for ci, val in enumerate(row):
@@ -794,12 +868,12 @@ class ReportGenerator:
             ('Number of Elements',         str(n_el)),
             ('Vessels per Stage',          ' | '.join(str(v) for v in vps)),
             ('Elements per Vessel',        str(sr.get('elements_per_vessel', 6))),
-            ('Feed Flow per Pass',         f"{sm.get('feed_flow', 0):.1f} m³/h"),
+            ('Feed Flow per Pass',         f"{conv_flow(sm.get('feed_flow', 0), ud):.1f} {flow_lbl}"),
             ('Feed TDS',                   f"{sm.get('feed_tds', 0):.1f} mg/L"),
-            ('Feed Pressure',              f"{sm.get('feed_pressure_bar', 0):.1f} bar"),
-            ('Permeate Flow per Pass',     f"{sm.get('perm_flow', 0):.1f} m³/h"),
-            ('Concentrate Flow',           f"{sm.get('conc_flow', 0):.1f} m³/h"),
-            ('Average Flux',               f"{sm.get('avg_flux_lmh', 0):.1f} LMH"),
+            ('Feed Pressure',              f"{conv_press(sm.get('feed_pressure_bar', 0), ud):.1f} {press_lbl}"),
+            ('Permeate Flow per Pass',     f"{conv_flow(sm.get('perm_flow', 0), ud):.1f} {flow_lbl}"),
+            ('Concentrate Flow',           f"{conv_flow(sm.get('conc_flow', 0), ud):.1f} {flow_lbl}"),
+            ('Average Flux',               f"{conv_flux(sm.get('avg_flux_lmh', 0), ud):.1f} {flux_lbl}"),
             ('Permeate TDS',               f"{sm.get('perm_tds', 0):.2f} mg/L"),
             ('Concentrate TDS',            f"{sm.get('conc_tds', 0):.0f} mg/L"),
             ('System Recovery',            f"{rec:.1f} %"),
@@ -815,11 +889,16 @@ class ReportGenerator:
 
     # ── Page 2: Stage + Element flow tables ─────────────────────────────────
 
-    def _page_flow_tables(self, doc, ro: dict, membrane: str, pass_label: str):
+    def _page_flow_tables(self, doc, ro: dict, membrane: str, pass_label: str, sr: dict):
         sm       = ro.get('summary', {})
         stages   = ro.get('stages', [])
         elements = ro.get('elements', [])
         vps      = sm.get('vessels_per_stage', [1])
+        
+        ud = sr.get('units', {})
+        flow_lbl = lbl_flow(ud)
+        press_lbl = lbl_press(ud)
+        flux_lbl = lbl_flux(ud)
 
         # Stage-level table
         _heading(doc, f'RO Flow Table (Stage Level) – {pass_label}')
@@ -837,17 +916,17 @@ class ReportGenerator:
             epv       = len(s_el) // vs if vs else len(s_el)
             stage_rows.append([
                 str(sn), membrane, str(vs), str(epv),
-                f"{stg['feed_flow']:.1f}",  f"{fp:.1f}",
-                f"{stg['perm_flow']:.1f}",  f"{stg['conc_flow']:.1f}",
-                f"{cp:.1f}", f"{dp:.1f}", f"{avg_flux:.1f}", f"{avg_ndp:.1f}",
+                f"{conv_flow(stg['feed_flow'], ud):.1f}",  f"{conv_press(fp, ud):.1f}",
+                f"{conv_flow(stg['perm_flow'], ud):.1f}",  f"{conv_flow(stg['conc_flow'], ud):.1f}",
+                f"{conv_press(cp, ud):.1f}", f"{conv_press(dp, ud):.1f}", f"{conv_flux(avg_flux, ud):.1f}", f"{conv_press(avg_ndp, ud):.1f}",
                 f"{stg['recovery']*100:.1f}",
             ])
         _data_table(doc,
             [['Stage', 'Element Name', '#PV', 'Els/PV',
-              'Feed\nFlow\n(m³/h)', 'Feed\nPress\n(bar)',
-              'Perm\nFlow\n(m³/h)', 'Conc\nFlow\n(m³/h)',
-              'Conc\nPress\n(bar)', 'Press\nDrop\n(bar)',
-              'Avg\nFlux\n(LMH)', 'Avg\nNDP\n(bar)', 'Recovery\n(%)']],
+              f'Feed\nFlow\n({flow_lbl})', f'Feed\nPress\n({press_lbl})',
+              f'Perm\nFlow\n({flow_lbl})', f'Conc\nFlow\n({flow_lbl})',
+              f'Conc\nPress\n({press_lbl})', f'Press\nDrop\n({press_lbl})',
+              f'Avg\nFlux\n({flux_lbl})', f'Avg\nNDP\n({press_lbl})', 'Recovery\n(%)']],
             stage_rows,
             col_widths=[0.8, 2.6, 0.7, 0.8, 1.3, 1.2, 1.3, 1.3, 1.2, 1.1, 1.1, 1.1, 1.3]
         )
@@ -862,16 +941,16 @@ class ReportGenerator:
             el_rows.append([
                 str(e.get('stage', '—')), str(e.get('position', '—')), membrane,
                 f"{e.get('recovery', 0)*100:.1f}",
-                f"{e.get('feed_flow', 0):.1f}",  f"{e.get('feed_pressure', 0):.2f}",
+                f"{conv_flow(e.get('feed_flow', 0), ud):.1f}",  f"{conv_press(e.get('feed_pressure', 0), ud):.2f}",
                 f"{feed_tds:.1f}",
-                f"{e.get('perm_flow', 0):.3f}",  f"{e.get('flux', 0):.1f}",
-                f"{e.get('ndp', 0):.2f}",         f"{e.get('beta', 0):.3f}",
+                f"{conv_flow(e.get('perm_flow', 0), ud):.3f}",  f"{conv_flux(e.get('flux', 0), ud):.1f}",
+                f"{conv_press(e.get('ndp', 0), ud):.2f}",         f"{e.get('beta', 0):.3f}",
                 f"{perm_tds:.3f}",
             ])
         _data_table(doc,
             [['Stage', 'Elem', 'Model', 'Recovery\n(%)',
-              'Feed Flow\n(m³/h)', 'Feed Press\n(bar)', 'Feed TDS\n(mg/L)',
-              'Perm Flow\n(m³/h)', 'Flux\n(LMH)', 'NDP\n(bar)',
+              f'Feed Flow\n({flow_lbl})', f'Feed Press\n({press_lbl})', 'Feed TDS\n(mg/L)',
+              f'Perm Flow\n({flow_lbl})', f'Flux\n({flux_lbl})', f'NDP\n({press_lbl})',
               'β', 'Perm TDS\n(mg/L)']],
             el_rows,
             col_widths=[0.8, 0.7, 2.4, 1.1, 1.3, 1.3, 1.3, 1.3, 1.1, 1.0, 1.0, 1.3]
@@ -882,11 +961,16 @@ class ReportGenerator:
         # (Stage Flow Bar Chart Removed as it's obvious from the table)
         
         _heading(doc, 'Hydraulic Performance & Visualization')
-        buf_flux_ndp = _chart_dual_profile(elements, 'Flux & NDP Along Element Train', 'flux', 'ndp', 'Flux (LMH)', 'NDP (bar)')
+        
+        # We need to scale chart arrays explicitly:
+        flux_scaled = [conv_flux(e.get('flux', 0), ud) for e in elements]
+        ndp_scaled = [conv_press(e.get('ndp', 0), ud) for e in elements]
+        buf_flux_ndp = _chart_dual_profile_manual(elements, flux_scaled, ndp_scaled, 'Flux & NDP Along Element Train', f'Flux ({flux_lbl})', f'NDP ({press_lbl})')
         _insert_chart(doc, buf_flux_ndp, width_in=6.0)
         _spacer(doc, 4)
 
-        buf_press = _chart_element_profile(elements, 'Feed Pressure Along Element Train', 'feed_pressure', 'Pressure (bar)', CHART_ORANGE)
+        press_scaled = [conv_press(e.get('feed_pressure', 0), ud) for e in elements]
+        buf_press = _chart_element_profile_manual(elements, press_scaled, 'Feed Pressure Along Element Train', f'Pressure ({press_lbl})', CHART_ORANGE)
         buf_beta  = _chart_element_profile(elements, 'Concentration Polarization (β)', 'beta', 'β (–)', CHART_BLUE)
         _insert_two_charts(doc, buf_press, buf_beta, width_in=3.1)
         _spacer(doc, 4)
@@ -1422,10 +1506,10 @@ class ReportGenerator:
 
         # ── Page 2: Stage + Element tables ───────────────────────────────────
         if ro_main:
-            self._page_flow_tables(doc, ro_main, mem1, pass_label='Pass 1')
+            self._page_flow_tables(doc, ro_main, mem1, pass_label='Pass 1', sr=sr)
 
         if pass2_res:
-            self._page_flow_tables(doc, pass2_res, mem2, pass_label='Pass 2')
+            self._page_flow_tables(doc, pass2_res, mem2, pass_label='Pass 2', sr=sr)
 
         # ── Page 3: Ion analysis ──────────────────────────────────────────────
         if ro_main:

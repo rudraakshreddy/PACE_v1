@@ -198,6 +198,7 @@ class SystemCalcInput(BaseModel):
     # Physics projection results (attached by JS from window.lastPhysicsResult)
     physics_results: Optional[dict] = None
     physics_selected_year: Optional[int] = 0
+    units: Optional[dict] = None
 
 @app.get("/")
 def read_root():
@@ -571,6 +572,8 @@ def generate_calc_report(data: SystemCalcInput):
             result["physics_selected_year"] = data.physics_selected_year
         if getattr(data, "project_details", None):
             result["project_details"] = data.project_details
+        if getattr(data, "units", None):
+            result["units"] = data.units
 
         # Generate .docx to a temp file
         tmp_docx = tempfile.NamedTemporaryFile(

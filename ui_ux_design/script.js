@@ -4189,9 +4189,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         const ufRec     = results.querySelector('#calc-uf-rec');
                         const ufTmp     = results.querySelector('#calc-uf-tmp');
                         if (ufModules) ufModules.innerText = data.uf_results.overview.total_modules;
-                        if (ufFlux)    ufFlux.innerText    = data.uf_results.operating_conditions.filtration_flux_lmh.toFixed(1);
+                        
+                        const fluxConv = conversions.flux ? conversions.flux.fromBase(data.uf_results.operating_conditions.filtration_flux_lmh, currentUnits.flux || 'LMH') : data.uf_results.operating_conditions.filtration_flux_lmh;
+                        const tmpConv = conversions.pressure.fromBase(data.uf_results.overview.tmp_design_bar, currentUnits.pressure);
+                        
+                        if (ufFlux)    ufFlux.innerText    = fluxConv.toFixed(1);
                         if (ufRec)     ufRec.innerText     = data.uf_results.overview.recovery_pct.toFixed(1);
-                        if (ufTmp)     ufTmp.innerText     = data.uf_results.overview.tmp_design_bar.toFixed(2);
+                        if (ufTmp)     ufTmp.innerText     = tmpConv.toFixed(2);
+                        
+                        const setT = (sel, val) => { const el = results.querySelector(sel); if (el) el.innerText = val; };
+                        setT('#calc-uf-flux-unit', currentUnits.flux || 'LMH');
+                        setT('#calc-uf-tmp-unit', currentUnits.pressure);
                     }
                 } else {
                     if (ufResultsCard) ufResultsCard.style.display = 'none';
@@ -4273,11 +4281,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.ro_results) {
                     const roSum = data.ro_results.summary;
                     const setR = (sel, val) => { const el = results.querySelector(sel); if (el) el.innerText = val; };
+                    
+                    const flowLabel = { 'm3/h': 'm³/h', 'm3/d': 'm³/d', 'gpm': 'gpm', 'gpd': 'gpd' }[currentUnits.flow] || 'm³/h';
+                    const pressLabel = currentUnits.pressure;
+                    
+                    const sysFlowConv = conversions.flow.fromBase(roSum.perm_flow, currentUnits.flow);
+                    const sysPressConv = conversions.pressure.fromBase(roSum.feed_pressure_bar, currentUnits.pressure);
+                    
                     setR('#calc-sys-rec',       (roSum.total_recovery * 100).toFixed(1));
-                    setR('#calc-sys-perm-flow', roSum.perm_flow.toFixed(1));
-                    setR('#calc-sys-press',     roSum.feed_pressure_bar.toFixed(1));
+                    setR('#calc-sys-perm-flow', sysFlowConv.toFixed(1));
+                    setR('#calc-sys-press',     sysPressConv.toFixed(1));
                     setR('#calc-sys-tds',       roSum.perm_tds.toFixed(1));
                     setR('#calc-sys-sec',       roSum.sec_kwh_m3.toFixed(2));
+                    
+                    setR('#calc-sys-perm-flow-unit', flowLabel);
+                    setR('#calc-sys-press-unit', pressLabel);
                     
                     // Render Recycle Summary
                     const recycleCard = results.querySelector('#calc-recycle-summary-card');
@@ -4288,7 +4306,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (elEffRec) elEffRec.innerText = data.recycle.effective_system_recovery_pct.toFixed(1);
 
                         const elRecPress = results.querySelector('#calc-rec-press');
-                        if (elRecPress) elRecPress.innerText = data.recycle.feed_pressure_bar.toFixed(1);
+                        const recPressConv = conversions.pressure.fromBase(data.recycle.feed_pressure_bar, currentUnits.pressure);
+                        if (elRecPress) elRecPress.innerText = recPressConv.toFixed(1);
+                        setR('#calc-rec-press-unit', pressLabel);
 
                         const elRecPermTds = results.querySelector('#calc-rec-perm-tds');
                         if (elRecPermTds) elRecPermTds.innerText = data.recycle.permeate_tds_mg_l.toFixed(1);
@@ -4297,10 +4317,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (elBlendTds) elBlendTds.innerText = data.recycle.blended_feed_tds_mg_l.toFixed(0);
 
                         const elRecFlow = results.querySelector('#calc-rec-flow');
-                        if (elRecFlow) elRecFlow.innerText = data.recycle.recycle_flow_m3h.toFixed(1);
+                        const recFlowConv = conversions.flow.fromBase(data.recycle.recycle_flow_m3h, currentUnits.flow);
+                        if (elRecFlow) elRecFlow.innerText = recFlowConv.toFixed(1);
+                        setR('#calc-rec-flow-unit', flowLabel);
 
                         const elBlendFlow = results.querySelector('#calc-rec-blend-flow');
-                        if (elBlendFlow) elBlendFlow.innerText = data.recycle.blended_feed_flow_m3h.toFixed(1);
+                        const blendFlowConv = conversions.flow.fromBase(data.recycle.blended_feed_flow_m3h, currentUnits.flow);
+                        if (elBlendFlow) elBlendFlow.innerText = blendFlowConv.toFixed(1);
+                        setR('#calc-rec-blend-flow-unit', flowLabel);
                         
                         const warnBlock = results.querySelector('#calc-rec-warning');
                         const warnText = results.querySelector('#calc-rec-warning-text');
@@ -4330,20 +4354,34 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Helper to safely write overview inner texts
                         const setT = (sel, val) => { const el = results.querySelector(sel); if (el) el.innerText = val; };
                         
+                        const flowLabel = { 'm3/h': 'm³/h', 'm3/d': 'm³/d', 'gpm': 'gpm', 'gpd': 'gpd' }[currentUnits.flow] || 'm³/h';
+                        const pressLabel = currentUnits.pressure;
+                        
+                        const p1Flow = conversions.flow.fromBase(p1sum.perm_flow || 0, currentUnits.flow);
+                        const p1Press = conversions.pressure.fromBase(p1sum.feed_pressure_bar || 0, currentUnits.pressure);
+                        const p2Flow = conversions.flow.fromBase(p2sum.perm_flow || 0, currentUnits.flow);
+                        const p2Press = conversions.pressure.fromBase(p2sum.feed_pressure_bar || 0, currentUnits.pressure);
+                        
                         // Pass 1 Overview Elements
-                        setT('#calc-2p-p1-rec',          (p1sum.total_recovery * 100).toFixed(1));
-                        setT('#calc-2p-p1-flow-summary',  p1sum.perm_flow.toFixed(1));
-                        setT('#calc-2p-p1-press',        p1sum.feed_pressure_bar.toFixed(1));
-                        setT('#calc-2p-p1-tds-summary',  p1sum.perm_tds.toFixed(2));
-                        setT('#calc-2p-p1-sec',          p1sum.sec_kwh_m3.toFixed(2));
+                        setT('#calc-2p-p1-rec',          ((p1sum.total_recovery || 0) * 100).toFixed(1));
+                        setT('#calc-2p-p1-flow-summary',  p1Flow.toFixed(1));
+                        setT('#calc-2p-p1-press',        p1Press.toFixed(1));
+                        setT('#calc-2p-p1-tds-summary',  (p1sum.perm_tds || 0).toFixed(2));
+                        setT('#calc-2p-p1-sec',          (p1sum.sec_kwh_m3 || 0).toFixed(2));
+                        
+                        setT('#calc-2p-p1-flow-summary-unit', flowLabel);
+                        setT('#calc-2p-p1-press-unit', pressLabel);
 
                         // Pass 2 Overview Elements
                         setT('#calc-2p-p2-rec',          (p2sum.total_recovery * 100).toFixed(1));
-                        setT('#calc-2p-p2-flow-summary',  p2sum.perm_flow.toFixed(1));
-                        setT('#calc-2p-p2-press-summary', p2sum.feed_pressure_bar.toFixed(1));
+                        setT('#calc-2p-p2-flow-summary',  p2Flow.toFixed(1));
+                        setT('#calc-2p-p2-press-summary', p2Press.toFixed(1));
                         setT('#calc-2p-p2-tds-summary',  p2sum.perm_tds.toFixed(2));
                         setT('#calc-2p-p2-sec',          p2sum.sec_kwh_m3.toFixed(2));
                         setT('#calc-2p-p2-pump',         (p2sum.hp_pump_power_kw || 0).toFixed(1));
+                        
+                        setT('#calc-2p-p2-flow-summary-unit', flowLabel);
+                        setT('#calc-2p-p2-press-summary-unit', pressLabel);
 
                         // Interstage Conditioning Element
                         const elCondDesc = results.querySelector('#calc-2p-cond-desc');
@@ -4373,34 +4411,45 @@ document.addEventListener('DOMContentLoaded', () => {
                             stagesHtml += `<tr style="background: var(--input-bg);"><td colspan="5" style="text-align: left; padding-left: 10px; font-weight: bold; color: var(--primary-color);">${passName}</td></tr>`;
                         }
                         
-                        stagesHtml += passData.stages.map(s => `
+                        stagesHtml += passData.stages.map(s => {
+                            const sf = conversions.flow.fromBase(s.feed_flow, currentUnits.flow);
+                            const sp = conversions.flow.fromBase(s.perm_flow, currentUnits.flow);
+                            const sc = conversions.flow.fromBase(s.conc_flow, currentUnits.flow);
+                            return `
                             <tr class="stage-summary-row" data-stage="${passPrefix ? passPrefix + '-' : ''}${s.stage}" style="cursor: pointer;" onclick="toggleStageElements('${passPrefix ? passPrefix + '-' : ''}${s.stage}', this)">
                                 <td style="text-align: left; font-weight: 600; padding-left: ${passPrefix ? '20px' : '10px'};"><i class="fa-solid fa-chevron-right" id="stage-chevron-${passPrefix ? passPrefix + '-' : ''}${s.stage}" style="margin-right: 0.5rem; color: var(--primary-color); transition: transform 0.2s; transform: rotate(0deg);"></i> Stage ${s.stage}</td>
-                                <td>${s.feed_flow.toFixed(2)}</td>
-                                <td>${s.perm_flow.toFixed(2)}</td>
-                                <td>${s.conc_flow.toFixed(2)}</td>
+                                <td>${sf.toFixed(2)}</td>
+                                <td>${sp.toFixed(2)}</td>
+                                <td>${sc.toFixed(2)}</td>
                                 <td>${(s.recovery * 100).toFixed(1)}%</td>
                             </tr>
-                        `).join('');
+                        `}).join('');
                         
                         if (passData.elements && passData.summary) {
                             const vesselsPerStage = passData.summary.vessels_per_stage || [];
                             for (let stageIdx = 0; stageIdx < vesselsPerStage.length; stageIdx++) {
                                 const stageElements = passData.elements.filter(e => e.stage === (stageIdx + 1));
                                 
-                                hydHtml += stageElements.map(e => `
+                                hydHtml += stageElements.map(e => {
+                                    const ef = conversions.flow.fromBase(e.feed_flow, currentUnits.flow);
+                                    const ep = conversions.flow.fromBase(e.perm_flow, currentUnits.flow);
+                                    const ec = conversions.flow.fromBase(e.conc_flow, currentUnits.flow);
+                                    const epress = conversions.pressure.fromBase(e.feed_pressure, currentUnits.pressure);
+                                    const edp = conversions.pressure.fromBase(e.dp, currentUnits.pressure);
+                                    const eflux = conversions.flux ? conversions.flux.fromBase(e.flux, currentUnits.flux || 'LMH') : e.flux;
+                                    return `
                                     <tr class="stage-row-${passPrefix ? passPrefix + '-' : ''}${e.stage}" style="display: none;">
                                         <td>${passPrefix === 'P2' ? 'P2-' : ''}S${e.stage}-E${e.position}</td>
-                                        <td>${e.feed_flow.toFixed(2)}</td>
-                                        <td>${e.perm_flow.toFixed(3)}</td>
-                                        <td>${e.conc_flow.toFixed(2)}</td>
-                                        <td>${e.feed_pressure.toFixed(1)}</td>
-                                        <td>${e.dp.toFixed(2)}</td>
-                                        <td>${e.flux.toFixed(1)}</td>
+                                        <td>${ef.toFixed(2)}</td>
+                                        <td>${ep.toFixed(3)}</td>
+                                        <td>${ec.toFixed(2)}</td>
+                                        <td>${epress.toFixed(1)}</td>
+                                        <td>${edp.toFixed(2)}</td>
+                                        <td>${eflux.toFixed(1)}</td>
                                         <td>${(e.recovery * 100).toFixed(1)}</td>
                                         <td>${e.beta.toFixed(2)}</td>
                                     </tr>
-                                `).join('');
+                                `}).join('');
                             }
                         }
                     };
@@ -4415,6 +4464,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (tbodyStage) tbodyStage.innerHTML = stagesHtml;
                     if (tbodyHyd) tbodyHyd.innerHTML = hydHtml;
+                    
+                    const dynFlowLabel = { 'm3/h': 'm³/h', 'm3/d': 'm³/d', 'gpm': 'gpm', 'gpd': 'gpd' }[currentUnits.flow] || 'm³/h';
+                    const dynPressLabel = currentUnits.pressure;
+                    const dynFluxLabel = currentUnits.flux || 'LMH';
+
+                    ['calc-stage-feed-flow-unit', 'calc-stage-perm-flow-unit', 'calc-stage-conc-flow-unit', 
+                     'calc-hyd-feed-flow-unit', 'calc-hyd-perm-flow-unit', 'calc-hyd-conc-flow-unit'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.innerText = `(${dynFlowLabel})`;
+                     });
+                     
+                    ['calc-hyd-feed-press-unit', 'calc-hyd-deltap-unit'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.innerText = `(${dynPressLabel})`;
+                    });
+                    
+                    const fUnitEl = document.getElementById('calc-hyd-flux-unit');
+                    if (fUnitEl) fUnitEl.innerText = `(${dynFluxLabel})`;
 
                     // Render Booster Pumps
                     const bpCard = results.querySelector('#calc-booster-pumps-card');
@@ -4423,15 +4490,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         const requiredPumps = data.ro_results.booster_pumps.filter(bp => bp.required);
                         if (requiredPumps.length > 0) {
                             if (bpCard) bpCard.style.display = 'block';
-                            if (tbodyBP) tbodyBP.innerHTML = requiredPumps.map(bp => `
+                            if (tbodyBP) tbodyBP.innerHTML = requiredPumps.map(bp => {
+                                const bpFlow = conversions.flow.fromBase(bp.flow_m3h, currentUnits.flow);
+                                const bpInlet = conversions.pressure.fromBase(bp.inlet_pressure_bar, currentUnits.pressure);
+                                const bpOutlet = conversions.pressure.fromBase(bp.outlet_pressure_bar, currentUnits.pressure);
+                                const bpDP = conversions.pressure.fromBase(bp.boost_dp_bar, currentUnits.pressure);
+                                return `
                                 <tr>
                                     <td style="text-align: left;"><i class="fa-solid fa-arrow-right" style="color: var(--primary-color); margin-right: 0.5rem;"></i>${bp.location}</td>
-                                    <td>${bp.flow_m3h.toFixed(1)}</td>
-                                    <td>${bp.inlet_pressure_bar.toFixed(1)} → ${bp.outlet_pressure_bar.toFixed(1)}</td>
-                                    <td><strong>+${bp.boost_dp_bar.toFixed(1)}</strong></td>
+                                    <td>${bpFlow.toFixed(1)}</td>
+                                    <td>${bpInlet.toFixed(1)} → ${bpOutlet.toFixed(1)}</td>
+                                    <td><strong>+${bpDP.toFixed(1)}</strong></td>
                                     <td>${bp.power_kw.toFixed(2)}</td>
                                 </tr>
-                            `).join('');
+                            `}).join('');
+                            
+                            const bpSet = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+                            bpSet('calc-bp-flow-unit', `(${dynFlowLabel})`);
+                            bpSet('calc-bp-inlet-press-unit', `(${dynPressLabel})`);
+                            bpSet('calc-bp-dp-unit', `(${dynPressLabel})`);
                         } else {
                             if (bpCard) bpCard.style.display = 'none';
                         }
@@ -4739,6 +4816,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         !w.type || !w.type.includes('Concentration Polarization')
                     );
                 }
+                payloadClone.units = window.currentUnits || {
+                    flow: 'm3/h', pressure: 'bar', flux: 'LMH', temp: 'C'
+                };
                 
                 const res = await fetch(API_BASE + '/api/generate-calculation-report', {
                     method: 'POST',
