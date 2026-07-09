@@ -606,14 +606,15 @@ class ROEngine:
         # Final System summary
         system_perm_ions = {}
         system_perm_tds = 0.0
-        feed_tds = sum(feed_ions.values())
-        conc_tds = sum(current_ions.values())
+        feed_tds = sum(v for k, v in feed_ions.items() if k not in ("SiO2", "B", "CO2"))
+        conc_tds = sum(v for k, v in current_ions.items() if k not in ("SiO2", "B", "CO2"))
         
         for ion in feed_ions.keys():
             if total_perm_flow > 0:
                 c = total_perm_mass[ion] / total_perm_flow
                 system_perm_ions[ion] = c
-                system_perm_tds += c
+                if ion not in ("SiO2", "B", "CO2"):
+                    system_perm_tds += c
             else:
                 system_perm_ions[ion] = 0.0
                 

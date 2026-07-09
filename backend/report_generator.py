@@ -308,10 +308,10 @@ def _chart_ion_bar_comparison(feed_w, perm_ions, conc_ions, figsize=(6.0, 3.0)):
 def _chart_tds_profile(elements, figsize=(5.5, 2.6)):
     """Show feed-side and concentrate-side TDS rising along element train."""
     xs  = [f"S{e['stage']}-E{e['position']}" for e in elements]
-    tds = [sum(e.get('feed_ions', {}).values()) for e in elements]
+    tds = [sum(v for k,v in e.get('feed_ions', {}).items() if k not in ("SiO2", "B", "CO2")) for e in elements]
     # Use rej_ions (concentrate-side ions) or conc_ions if present
     tds_conc = [
-        sum(e.get('conc_ions', e.get('rej_ions', e.get('feed_ions', {}))).values())
+        sum(v for k,v in e.get('conc_ions', e.get('rej_ions', e.get('feed_ions', {}))).items() if k not in ("SiO2", "B", "CO2"))
         for e in elements
     ]
     fig, ax = plt.subplots(figsize=figsize)
@@ -692,7 +692,7 @@ class ReportGenerator:
         pd = sr.get('project_details', {})
         proj_name = pd.get('name') or sr.get('project_name', 'PACE Report')
         _add_header_block(doc, proj_name)
-        _heading(doc, 'RO Summary Report', size=13)
+        _heading(doc, 'RO Summary Report', size=16)
 
         # ── Project Information Table ──
         if pd:
@@ -815,11 +815,10 @@ class ReportGenerator:
 
     # ── Page 2: Stage + Element flow tables ─────────────────────────────────
 
-    def _page_flow_tables(self, doc, ro_results, membrane_model, pass_label='Pass 1'):
-        _add_header_block(doc, '')
-        sm       = ro_results.get('summary', {})
-        stages   = ro_results.get('stages', [])
-        elements = ro_results.get('elements', [])
+    def _page_flow_tables(self, doc, ro: dict, membrane: str, pass_label: str):
+        sm       = ro.get('summary', {})
+        stages   = ro.get('stages', [])
+        elements = ro.get('elements', [])
         vps      = sm.get('vessels_per_stage', [1])
 
         # Stage-level table
@@ -837,7 +836,7 @@ class ReportGenerator:
             dp        = fp - cp
             epv       = len(s_el) // vs if vs else len(s_el)
             stage_rows.append([
-                str(sn), membrane_model, str(vs), str(epv),
+                str(sn), membrane, str(vs), str(epv),
                 f"{stg['feed_flow']:.1f}",  f"{fp:.1f}",
                 f"{stg['perm_flow']:.1f}",  f"{stg['conc_flow']:.1f}",
                 f"{cp:.1f}", f"{dp:.1f}", f"{avg_flux:.1f}", f"{avg_ndp:.1f}",
@@ -858,10 +857,10 @@ class ReportGenerator:
         _heading(doc, f'RO Flow Table (Element Level) – {pass_label}')
         el_rows = []
         for e in elements:
-            feed_tds = sum(e.get('feed_ions', {}).values())
-            perm_tds = sum(e.get('perm_ions', {}).values())
+            feed_tds = sum(v for k,v in e.get('feed_ions', {}).items() if k not in ("SiO2", "B", "CO2"))
+            perm_tds = sum(v for k,v in e.get('perm_ions', {}).items() if k not in ("SiO2", "B", "CO2"))
             el_rows.append([
-                str(e.get('stage', '—')), str(e.get('position', '—')), membrane_model,
+                str(e.get('stage', '—')), str(e.get('position', '—')), membrane,
                 f"{e.get('recovery', 0)*100:.1f}",
                 f"{e.get('feed_flow', 0):.1f}",  f"{e.get('feed_pressure', 0):.2f}",
                 f"{feed_tds:.1f}",
@@ -895,10 +894,9 @@ class ReportGenerator:
         # (TDS Profile Chart Removed as it's obvious from the table)
     # ── Page 3: Ion analysis ──────────────────────────────────────────────
 
-    def _page_ion_analysis(self, doc, ro_results, feed_water):
-        _add_header_block(doc, '')
-        _heading(doc, 'RO Solute Concentrations & Rejection Analysis', size=13)
-        sm        = ro_results.get('summary', {})
+    def _page_ion_analysis(self, doc, ro: dict, fw: dict):
+        _heading(doc, 'RO Solute Concentrations & Rejection Analysis', size=16)
+        sm        = ro.get('summary', {})
         perm_ions = sm.get('perm_ions', {})
         conc_ions = sm.get('conc_ions', {})
 
@@ -914,7 +912,7 @@ class ReportGenerator:
         ion_rows = []
         active_ions = {}
         for ion, key in ion_map.items():
-            fc = feed_water.get(key, 0.0)
+            fc = fw.get(key, 0.0)
             pc = perm_ions.get(ion, 0.0)
             cc = conc_ions.get(ion, 0.0)
             rej = (1 - pc / fc) * 100 if fc > 0 else 100.0
@@ -943,9 +941,8 @@ class ReportGenerator:
         
     # ── Page 5: Warnings ─────────────────────────────────────────────────────
 
-    def _page_warnings(self, doc, ro_results, pass2_results=None):
-        _add_header_block(doc, '')
-        _heading(doc, 'RO Design Warnings', size=13)
+    def _page_warnings(self, doc, ro_results: dict, pass2_results: dict = None):
+        _heading(doc, 'RO Design Warnings', size=16)
 
         all_warnings = []
         for w in ro_results.get('warnings', []):
@@ -970,42 +967,98 @@ class ReportGenerator:
                  italic=True, color=BRAND_COLOR)
 
         _spacer(doc, 6)
-        _heading(doc, 'RO Solubility Warnings')
-        
-        from system_engine import _compute_nf_concentrate_scaling
-        sm = ro_results.get('summary', {})
-        conc_ions = sm.get('conc_ions', {})
-        feed_ph = ro_results.get('feed_ph', 7.0)
-        # Try to get temperature from feed data or ro_results; default to 25.0
-        temp_c = 25.0 # fallback
-        try:
-            if 'feed' in ro_results and 'temperature' in ro_results['feed']:
-                temp_c = float(ro_results['feed']['temperature'])
-        except:
-            pass
-            
-        sol_rows = []
-        try:
-            scaling = _compute_nf_concentrate_scaling(conc_ions, feed_ph, temp_c)
-            if scaling.get("CaCO3_calcite", {}).get("antiscalant_required"):
-                sol_rows.append(["Calcite saturation exceeded (LSI > 0) – Risk of carbonate scaling.", "Acid dosing or anti-scalant required."])
-            if scaling.get("CaSO4_gypsum", {}).get("antiscalant_required"):
-                sol_rows.append(["Gypsum saturation exceeded (SI > 0) – Risk of calcium sulfate scaling.", "Verify anti-scalant efficacy."])
-            if scaling.get("BaSO4_barite", {}).get("antiscalant_required"):
-                sol_rows.append(["Barite saturation exceeded (SI > 0) – High risk of barium sulfate scaling.", "Specialized anti-scalant required."])
-            if scaling.get("SrSO4_celestite", {}).get("antiscalant_required"):
-                sol_rows.append(["Celestite saturation exceeded (SI > 0) – Risk of strontium scaling.", "Use specialized anti-scalant."])
-            if scaling.get("CaF2_fluorite", {}).get("antiscalant_required"):
-                sol_rows.append(["Fluorite saturation exceeded (SI > 0) – Risk of calcium fluoride scaling.", "Use specialized anti-scalant."])
-            if scaling.get("SiO2", {}).get("antiscalant_required"):
-                sol_rows.append(["Amorphous Silica saturation > 80% – Risk of silica polymerization.", "Consider pH adjustment or silica-specific anti-scalant."])
-        except Exception:
-            pass
+        _heading(doc, 'Concentrate Saturation Indices (PHREEQC)')
 
-        if not sol_rows:
-            sol_rows.append(["No critical solubility limits exceeded for major scalants.", "General anti-scalant recommended as best practice."])
+        # Prefer the PHREEQC SI data attached during physics projection.
+        # Fall back to the legacy heuristic if not available.
+        conc_si = ro_results.get('concentrate_si')
+        conc_ph = ro_results.get('concentrate_ph')
 
-        _data_table(doc, [['Warning', 'Recommended Solution']], sol_rows, col_widths=[7.5, 7.0])
+        if conc_si:
+            # Show equilibrium pH header
+            if conc_ph is not None:
+                p = doc.add_paragraph()
+                _run(p, 'PHREEQC Equilibrium Concentrate pH:  ', bold=True)
+                _run(p, f'{conc_ph:.2f}  ', bold=True, color='2563EB')
+                _run(p, '(thermodynamically computed — no manual assumption)', italic=True)
+
+            _spacer(doc, 4)
+
+            SI_LIMITS = {
+                'Calcite':   {'mod': 0.0,  'high': 0.5, 'crit': 1.0,  'formula': 'CaCO3',        'rec_mod': 'Acid dosing or antiscalant recommended.', 'rec_high': 'Antiscalant dosing required.', 'rec_crit': 'Critical: reduce recovery or use strong acid/antiscalant.'},
+                'Aragonite': {'mod': 0.0,  'high': 0.5, 'crit': 1.0,  'formula': 'CaCO3 (orth.)', 'rec_mod': 'Carbonate scaling risk.', 'rec_high': 'Antiscalant dosing required.', 'rec_crit': 'Critical: carbonate scaling very likely.'},
+                'Dolomite':  {'mod': 0.0,  'high': 1.0, 'crit': 2.0,  'formula': 'CaMg(CO3)2',   'rec_mod': 'Monitor dolomite saturation.', 'rec_high': 'Antiscalant recommended.', 'rec_crit': 'Severe dolomite scaling risk.'},
+                'Gypsum':    {'mod': 0.0,  'high': 0.3, 'crit': 0.5,  'formula': 'CaSO4.2H2O',   'rec_mod': 'Antiscalant recommended.', 'rec_high': 'Antiscalant required; reduce recovery if possible.', 'rec_crit': 'Critical: Gypsum scale likely even with antiscalant.'},
+                'Anhydrite': {'mod': 0.0,  'high': 0.3, 'crit': 0.5,  'formula': 'CaSO4',         'rec_mod': 'Antiscalant recommended.', 'rec_high': 'Antiscalant required.', 'rec_crit': 'Critical: reduce recovery.'},
+                'Barite':    {'mod': -0.2, 'high': 0.0, 'crit': 0.3,  'formula': 'BaSO4',         'rec_mod': 'Specialized antiscalant needed.', 'rec_high': 'Antiscalant required - Barite is very insoluble.', 'rec_crit': 'Critical: Barite scale almost certain without inhibitor.'},
+                'Celestite': {'mod': 0.0,  'high': 0.2, 'crit': 0.4,  'formula': 'SrSO4',         'rec_mod': 'Specialized antiscalant recommended.', 'rec_high': 'Antiscalant required.', 'rec_crit': 'Critical: Celestite scaling likely.'},
+                'Fluorite':  {'mod': 0.0,  'high': 0.5, 'crit': 0.5,  'formula': 'CaF2',          'rec_mod': 'Monitor fluoride-calcium balance.', 'rec_high': 'Antiscalant required.', 'rec_crit': 'Critical: Fluorite scaling risk.'},
+                'SiO2(a)':   {'mod': -0.1, 'high': 0.0, 'crit': 0.2,  'formula': 'SiO2 (am.)',    'rec_mod': 'pH adjust. or silica antiscalant.', 'rec_high': 'Silica antiscalant required.', 'rec_crit': 'Critical: Silica fouling very likely; reduce recovery.'},
+            }
+
+            RISK_COLORS = {
+                'NONE':     (None, 'No action required.'),
+                'LOW':      ('70CF9F', 'Monitor. No immediate action required.'),
+                'MODERATE': ('F59E0B', None),
+                'HIGH':     ('F97316', None),
+                'CRITICAL': ('EF4444', None),
+            }
+
+            si_rows = []
+            for mineral, si_val in conc_si.items():
+                lim = SI_LIMITS.get(mineral)
+                if not lim:
+                    continue
+                risk = 'NONE'
+                rec  = 'No action required.'
+                if si_val > lim['crit']:
+                    risk = 'CRITICAL'; rec = lim['rec_crit']
+                elif si_val > lim['high']:
+                    risk = 'HIGH';     rec = lim['rec_high']
+                elif si_val > lim['mod']:
+                    risk = 'MODERATE'; rec = lim['rec_mod']
+                elif si_val > lim['mod'] - 0.2:
+                    risk = 'LOW';      rec = 'Monitor. No immediate action required.'
+                si_rows.append([mineral, lim['formula'], f'{si_val:+.3f}', risk, rec])
+
+            _data_table(doc,
+                [['Mineral', 'Formula', 'SI (Conc.)', 'Risk', 'Recommendation']],
+                si_rows,
+                col_widths=[2.5, 2.2, 1.8, 1.8, 6.2]
+            )
+        else:
+            # Legacy fallback
+            from system_engine import _compute_nf_concentrate_scaling
+            sm = ro_results.get('summary', {})
+            conc_ions = sm.get('conc_ions', {})
+            feed_ph = ro_results.get('feed_ph', 7.0)
+            temp_c = 25.0
+            try:
+                if 'feed' in ro_results and 'temperature' in ro_results['feed']:
+                    temp_c = float(ro_results['feed']['temperature'])
+            except Exception:
+                pass
+            sol_rows = []
+            try:
+                scaling = _compute_nf_concentrate_scaling(conc_ions, feed_ph, temp_c)
+                if scaling.get('CaCO3_calcite', {}).get('antiscalant_required'):
+                    sol_rows.append(['Calcite saturation exceeded (LSI > 0) - Risk of carbonate scaling.', 'Acid dosing or anti-scalant required.'])
+                if scaling.get('CaSO4_gypsum', {}).get('antiscalant_required'):
+                    sol_rows.append(['Gypsum saturation exceeded (SI > 0) - Risk of calcium sulfate scaling.', 'Verify anti-scalant efficacy.'])
+                if scaling.get('BaSO4_barite', {}).get('antiscalant_required'):
+                    sol_rows.append(['Barite saturation exceeded (SI > 0) - High risk of barium sulfate scaling.', 'Specialized anti-scalant required.'])
+                if scaling.get('SrSO4_celestite', {}).get('antiscalant_required'):
+                    sol_rows.append(['Celestite saturation exceeded (SI > 0) - Risk of strontium scaling.', 'Use specialized anti-scalant.'])
+                if scaling.get('CaF2_fluorite', {}).get('antiscalant_required'):
+                    sol_rows.append(['Fluorite saturation exceeded (SI > 0) - Risk of calcium fluoride scaling.', 'Use specialized anti-scalant.'])
+                if scaling.get('SiO2', {}).get('antiscalant_required'):
+                    sol_rows.append(['Amorphous Silica saturation > 80% - Risk of silica polymerization.', 'Consider pH adjustment or silica-specific anti-scalant.'])
+            except Exception:
+                pass
+            if not sol_rows:
+                sol_rows.append(['No critical solubility limits exceeded for major scalants.', 'General anti-scalant recommended as best practice.'])
+            _data_table(doc, [['Warning', 'Recommended Solution']], sol_rows, col_widths=[7.5, 7.0])
+
         _spacer(doc, 6)
 
         _heading(doc, 'RO Chemical Adjustments (Pass 1 Feed vs Concentrate)')
@@ -1027,8 +1080,7 @@ class ReportGenerator:
     # ── Page 6: Economics ────────────────────────────────────────────────────
 
     def _page_economics(self, doc, economics):
-        _add_header_block(doc, '')
-        _heading(doc, 'Economic Analysis Summary', size=13)
+        _heading(doc, 'Economic Analysis Summary', size=16)
 
         capex   = economics.get('capex', {})
         opex    = economics.get('opex', {})
@@ -1102,7 +1154,8 @@ class ReportGenerator:
         ax1.set_title('Normalised Performance Factors (ASTM D4516-19a)')
         ax1.set_xlabel('Year'); ax1.set_ylabel('NPF (Permeability)', color=CHART_BRAND)
         ax2.set_ylabel('NSP (Salt Passage)', color=CHART_ORANGE)
-        ax1.set_ylim(0.5, 1.05); ax2.set_ylim(0.5, 1.05)
+        ax1.set_ylim(bottom=min(0.5, min(npfs)*0.9), top=1.05)
+        ax2.set_ylim(bottom=0.5, top=max(1.1, max(nsps)*1.1))
         ax1.set_xticks(years)
         ax1.legend(handles=[l1, l2], fontsize=7, loc='lower left')
         ax1.spines['top'].set_visible(False)
@@ -1150,8 +1203,7 @@ class ReportGenerator:
     def _page_physics_projection(self, doc, physics: dict, proj_name: str,
                                   selected_year: int = 0):
         """Generate the Physics-Based Multi-Year Performance Projection page."""
-        _add_header_block(doc, proj_name)
-        _heading(doc, 'Year-Wise Performance', size=13)
+        _heading(doc, 'Year-Wise Performance', size=16)
         _spacer(doc, 6)
 
         snapshots = physics.get('annual_snapshots', [])
@@ -1250,7 +1302,6 @@ class ReportGenerator:
                 ['NOM Adsorption (Rn)', f"{sel.get('rn_avg', 0):.3e}",
                  f"{sel.get('rn_avg', 0) / max(rf_sum, 1e-10) * 100:.1f}%"],
                 ['Compaction (Structural)', f"{sel.get('rcomp', 0):.3e}", 'N/A'],
-                ['Dominant Mechanism', physics.get('dominant_mechanism', 'N/A').replace('_', ' ').title(), ''],
             ],
             col_widths=[5.5, 4.5, 4.5]
         )
@@ -1304,8 +1355,7 @@ class ReportGenerator:
         _spacer(doc, 8)
 
     def _page_aging_summary(self, doc, aging: dict, proj_name: str):
-        _add_header_block(doc, proj_name)
-        _heading(doc, 'Membrane Aging Summary')
+        _heading(doc, 'Membrane Aging Summary', size=16)
         _spacer(doc, 6)
 
         profile = aging.get('aging_profile', [])
@@ -1330,8 +1380,7 @@ class ReportGenerator:
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(4)
         _run(p, 'Footnotes: ', bold=True, size=8)
-        _run(p, '*TDS and Conductivity include ions, SiO₂, and B. '
-               'NH₃ and CO₂ are not included.',
+        _run(p, '*TDS and Conductivity include dissolved ionic salts only (excludes SiO₂, B, CO₂). ',
              italic=True, size=8)
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -1358,39 +1407,37 @@ class ReportGenerator:
 
         # ── Page 2: Stage + Element tables ───────────────────────────────────
         if ro_main:
-            doc.add_page_break()
             self._page_flow_tables(doc, ro_main, mem1, pass_label='Pass 1')
 
         if pass2_res:
-            doc.add_page_break()
             self._page_flow_tables(doc, pass2_res, mem2, pass_label='Pass 2')
 
         # ── Page 3: Ion analysis ──────────────────────────────────────────────
         if ro_main:
-            doc.add_page_break()
             self._page_ion_analysis(doc, ro_main, fw)
 
         # ── Page 5: Warnings ──────────────────────────────────────────────────
-        doc.add_page_break()
+        # Inject PHREEQC SI data into ro_main so _page_warnings can display it.
+        # These keys are attached by the physics endpoint; missing on plain calculate-system calls.
+        if ro_main is not None:
+            ro_main['concentrate_si'] = sr.get('concentrate_si')
+            ro_main['concentrate_ph'] = sr.get('concentrate_ph')
         self._page_warnings(doc, ro_main or {}, pass2_res)
 
         # ── Page 6: Economics ────────────────────────────────────────────────
         economics = sr.get('economics')
         if economics:
-            doc.add_page_break()
             self._page_economics(doc, economics)
 
         # ── Page 7: Membrane Aging ───────────────────────────────────────────
         aging_res = sr.get('aging_results')
         if aging_res:
-            doc.add_page_break()
             self._page_aging_summary(doc, aging_res, proj)
 
         # ── Page 8: Physics-Based Multi-Year Performance Projection ──────────
         physics_res = sr.get('physics_results')
         if physics_res:
             selected_yr = sr.get('physics_selected_year', 0)
-            doc.add_page_break()
             self._page_physics_projection(doc, physics_res, proj, selected_year=selected_yr)
 
         # Footer

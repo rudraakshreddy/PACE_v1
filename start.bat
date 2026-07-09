@@ -6,7 +6,7 @@ if not exist venv\Scripts\activate (
     echo [INFO] First time setup: Creating virtual environment and installing dependencies...
     python -m venv venv
     call venv\Scripts\activate
-    pip install fastapi uvicorn phreeqpython pydantic
+    pip install fastapi uvicorn phreeqpython pydantic docx2pdf pymupdf
 ) else (
     call venv\Scripts\activate
 )

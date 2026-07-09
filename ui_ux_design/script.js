@@ -137,7 +137,7 @@ window.proceedToApp = function() {
     }
 };
 
-window.saveProjectDetails = function(event) {
+window.saveProjectDetails = async function(event) {
     if (event) event.preventDefault();
     window.validateProjectModal();
     const pName = document.getElementById('proj-name');
@@ -147,7 +147,59 @@ window.saveProjectDetails = function(event) {
             lastSaved.textContent = new Date().toLocaleTimeString();
             lastSaved.style.color = 'var(--success-color, #10b981)';
         }
-        alert('Project details saved locally.');
+        // Sync sticky footer bar
+        const footerSaved = document.getElementById('footer-last-saved');
+        if (footerSaved) footerSaved.textContent = new Date().toLocaleTimeString();
+        const footerStatus = document.getElementById('footer-project-status');
+        if (footerStatus) footerStatus.textContent = 'Saved';
+        const statusDot = document.getElementById('footer-status-dot');
+        if (statusDot) statusDot.style.background = '#10b981';
+        
+        // Collect all inputs, selects, and textareas
+        const data = {};
+        document.querySelectorAll('input, select, textarea').forEach(el => {
+            if (el.id) {
+                if (el.type === 'checkbox') {
+                    data[el.id] = el.checked;
+                } else if (el.type === 'radio') {
+                    if (el.checked) data[el.name] = el.value; // Store radio groups by name
+                } else if (el.type !== 'file') {
+                    data[el.id] = el.value;
+                }
+            }
+        });
+        
+        const jsonStr = JSON.stringify(data, null, 2);
+        const fileName = (pName.value.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'project') + '.prt';
+
+        try {
+            if ('showSaveFilePicker' in window) {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+                    types: [{
+                        description: 'PACE Project Files',
+                        accept: {'application/json': ['.prt', '.json']},
+                    }],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(jsonStr);
+                await writable.close();
+            } else {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonStr);
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", fileName);
+                document.body.appendChild(downloadAnchorNode); 
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            }
+            window.isProjectDirty = false;
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error("Error saving project:", err);
+                alert("An error occurred while saving the project.");
+            }
+        }
     } else {
         alert('Please provide a PROJECT NAME before saving.');
     }
@@ -161,7 +213,47 @@ window.startNewProject = function() {
 };
 
 window.loadProjectFromFile = function() {
-    alert('Load project from file is not yet implemented in this phase.');
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.prt,.json';
+    fileInput.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                Object.keys(data).forEach(key => {
+                    const el = document.getElementById(key);
+                    if (el) {
+                        if (el.type === 'checkbox') {
+                            el.checked = data[key];
+                        } else {
+                            el.value = data[key];
+                        }
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                        // Check for radio buttons by name
+                        const radios = document.querySelectorAll(`input[type="radio"][name="${key}"]`);
+                        radios.forEach(radio => {
+                            if (radio.value === data[key]) {
+                                radio.checked = true;
+                                radio.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        });
+                    }
+                });
+                window.isProjectDirty = false;
+                window.validateProjectModal();
+                if (typeof calculateChemistry === 'function') calculateChemistry(true);
+            } catch (err) {
+                alert("Invalid project file.");
+            }
+        };
+        reader.readAsText(file);
+    };
+    fileInput.click();
 };
 
 window.addEventListener('beforeunload', (e) => {
@@ -1104,8 +1196,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const viewId = tabButtons[id].viewId;
                 const view = document.getElementById(viewId);
                 if (view) {
-                    if (viewId === 'project-details-panel-view' || viewId === 'file-panel-view') {
+                    if (viewId === 'project-details-panel-view' || viewId === 'file-panel-view' || viewId === 'feed-dashboard-view' || viewId === 'report-panel-view') {
                         view.style.display = 'flex';
+                        view.style.flexDirection = 'column';
                     } else {
                         view.style.display = 'grid';
                     }
@@ -1462,7 +1555,11 @@ async function fetchProcessRecommendation() {
         const alVal = parseFloat((document.getElementById('al') || {}).value) || 0;
         const feVal = parseFloat(document.getElementById('fe').value) || 0;
         const mnVal = parseFloat(document.getElementById('mn').value) || 0;
-        payload.feed_tds = payload.ca + payload.mg_ion + payload.na + payload.k + payload.cl + payload.so4 + payload.hco3 + payload.sio2 + alVal + feVal + mnVal;
+        const co3Val = parseFloat(document.getElementById('co3').value) || 0;
+        const no3Val = parseFloat(document.getElementById('no3').value) || 0;
+        const po4Val = parseFloat(document.getElementById('po4').value) || 0;
+        const nh4Val = parseFloat(document.getElementById('nh4').value) || 0;
+        payload.feed_tds = payload.ca + payload.mg_ion + payload.na + payload.k + payload.ba + payload.sr + payload.cl + payload.so4 + payload.hco3 + payload.f + co3Val + no3Val + po4Val + nh4Val + alVal + feVal + mnVal;
     }
     
     // Attempt to map water type dropdown to source_type
@@ -2306,7 +2403,7 @@ function calculateChemistry(showAllResults = false) {
     if (sio2Caco3El) sio2Caco3El.textContent = '0.00';
 
     // Update Table Totals Live
-    const grandTotalMg = totalCatMg + totalAnMg + sio2;
+    const grandTotalMg = totalCatMg + totalAnMg;
     const grandTotalMeq = totalCatMeq + totalAnMeq;
     const grandTotalCaCO3 = totalCatCaCO3 + totalAnCaCO3;
 
@@ -3483,14 +3580,8 @@ window.runAutoBalance = function() {
         po4: 94.97, z_po4: 3
     };
 
-    const alk_meq = bicarbonate / 50.04;
-    let hco3_meq = alk_meq;
-    let co3_meq = 0.0;
-    if (ph >= 8.3) {
-        const fraction_co3 = Math.pow(10, ph - 10.3) / (1 + Math.pow(10, ph - 10.3));
-        co3_meq = alk_meq * fraction_co3;
-        hco3_meq = alk_meq - co3_meq;
-    }
+    const hco3_meq = (bicarbonate / mw.hco3) * mw.z_hco3;
+    const co3_meq = (carbonate / mw.co3) * mw.z_co3;
 
     const cat_meq = 
         (calcium / mw.ca) * mw.z_ca +
@@ -4348,6 +4439,63 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                     }
                     if (tbodyIon) tbodyIon.innerHTML = ionsHtml;
+
+                    // ── Render PHREEQC Concentrate Scaling Risks ──────────────
+                    const siCard  = results.querySelector('#calc-si-card');
+                    const siTbody = results.querySelector('#calc-si-tbody');
+                    const siPhEl  = results.querySelector('#calc-conc-ph');
+                    const siData  = data.concentrate_si;
+                    const siPh   = data.concentrate_ph;
+
+                    if (siData && siCard) {
+                        siCard.style.display = 'block';
+                        if (siPhEl) siPhEl.textContent = siPh != null ? siPh.toFixed(2) : '—';
+
+                        // Thresholds: { mod, high, crit } — lower bound triggers each tier
+                        const SI_LIMITS = {
+                            'Calcite':   { mod: 0.0,  high: 0.5, crit: 1.0,  formula: 'CaCO₃',       rec_mod: 'Acid dosing or antiscalant recommended.', rec_high: 'Antiscalant dosing required.', rec_crit: 'Critical: reduce recovery or use strong acid/antiscalant.' },
+                            'Aragonite': { mod: 0.0,  high: 0.5, crit: 1.0,  formula: 'CaCO₃ (orth.)',rec_mod: 'Carbonate scaling risk.', rec_high: 'Antiscalant dosing required.', rec_crit: 'Critical: carbonate scaling very likely.' },
+                            'Dolomite':  { mod: 0.0,  high: 1.0, crit: 2.0,  formula: 'CaMg(CO₃)₂',  rec_mod: 'Monitor dolomite saturation.', rec_high: 'Antiscalant recommended.', rec_crit: 'Severe dolomite scaling risk.' },
+                            'Gypsum':    { mod: 0.0,  high: 0.3, crit: 0.5,  formula: 'CaSO₄·2H₂O',  rec_mod: 'Antiscalant recommended.', rec_high: 'Antiscalant required — reduce recovery if possible.', rec_crit: 'Critical: Gypsum scale likely even with antiscalant.' },
+                            'Anhydrite': { mod: 0.0,  high: 0.3, crit: 0.5,  formula: 'CaSO₄',        rec_mod: 'Antiscalant recommended.', rec_high: 'Antiscalant required.', rec_crit: 'Critical: reduce recovery.' },
+                            'Barite':    { mod: -0.2, high: 0.0, crit: 0.3,  formula: 'BaSO₄',        rec_mod: 'Specialized antiscalant needed.', rec_high: 'Antiscalant required — Barite is very insoluble.', rec_crit: 'Critical: Barite scale almost certain without inhibitor.' },
+                            'Celestite': { mod: 0.0,  high: 0.2, crit: 0.4,  formula: 'SrSO₄',        rec_mod: 'Specialized antiscalant recommended.', rec_high: 'Antiscalant required.', rec_crit: 'Critical: Celestite scaling likely.' },
+                            'Fluorite':  { mod: 0.0,  high: 0.5, crit: 0.5,  formula: 'CaF₂',         rec_mod: 'Monitor fluoride-calcium balance.', rec_high: 'Antiscalant required.', rec_crit: 'Critical: Fluorite scaling risk.' },
+                            'SiO2(a)':   { mod: -0.1, high: 0.0, crit: 0.2,  formula: 'SiO₂ (am.)',   rec_mod: 'Silica approaching saturation — pH adjustment or silica antiscalant.', rec_high: 'Silica antiscalant required.', rec_crit: 'Critical: Silica fouling very likely — reduce recovery.' },
+                        };
+
+                        const RISK_STYLES = {
+                            'NONE':     { bg: 'rgba(16,185,129,0.15)', color: '#10b981', label: '✓ None' },
+                            'LOW':      { bg: 'rgba(16,185,129,0.1)',  color: '#6ee7b7', label: '↗ Low' },
+                            'MODERATE': { bg: 'rgba(251,191,36,0.15)', color: '#f59e0b', label: '⚠ Moderate' },
+                            'HIGH':     { bg: 'rgba(249,115,22,0.15)', color: '#f97316', label: '⚠ High' },
+                            'CRITICAL': { bg: 'rgba(239,68,68,0.15)',  color: '#ef4444', label: '✕ Critical' },
+                        };
+
+                        let siHtml = '';
+                        for (const [mineral, siVal] of Object.entries(siData)) {
+                            const lim = SI_LIMITS[mineral];
+                            if (!lim) continue;
+                            let risk = 'NONE';
+                            let rec  = 'No action required.';
+                            if (siVal > lim.crit)       { risk = 'CRITICAL'; rec = lim.rec_crit; }
+                            else if (siVal > lim.high)  { risk = 'HIGH';     rec = lim.rec_high; }
+                            else if (siVal > lim.mod)   { risk = 'MODERATE'; rec = lim.rec_mod; }
+                            else if (siVal > lim.mod - 0.2) { risk = 'LOW'; rec = 'Monitor. No immediate action required.'; }
+
+                            const rs = RISK_STYLES[risk];
+                            siHtml += `
+                                <tr>
+                                    <td style="text-align:left; font-weight:600;">${mineral}</td>
+                                    <td style="color:var(--text-secondary); font-size:0.8rem;">${lim.formula}</td>
+                                    <td style="font-family:monospace; font-weight:700; color:${siVal > 0 ? (risk === 'CRITICAL' ? '#ef4444' : risk === 'HIGH' ? '#f97316' : '#f59e0b') : 'var(--text-secondary)'};">${siVal.toFixed(3)}</td>
+                                    <td><span style="padding:0.2rem 0.6rem; border-radius:4px; font-size:0.72rem; font-weight:700; background:${rs.bg}; color:${rs.color};">${rs.label}</span></td>
+                                </tr>`;
+                        }
+                        if (siTbody) siTbody.innerHTML = siHtml;
+                    } else {
+                        if (siCard) siCard.style.display = 'none';
+                    }
                     
                     // Render Warnings
                     let allWarnings = [];
@@ -5229,8 +5377,10 @@ function buildSVG() {
   // 2. Draw final concentrate collection manifold and outlet
   const finalManifoldY = Math.max(...passExits.map(p => p.concentrateY)) + 50; // drop down more to give space
   
-  const hasRecycle = state.passes.length >= 2;
-  const recyclePass = 1; // Pass 2
+  const hasPass2Recycle = state.passes.length >= 2;
+  
+  const elRecycleEnable = document.getElementById('calc-recycle-enable');
+  const hasUserRecycle = elRecycleEnable && elRecycleEnable.checked;
 
   passExits.forEach((p, idx) => {
     // Drop down each pass concentrate to final bottom header
@@ -5255,14 +5405,16 @@ function buildSVG() {
   // Final outlet
   fullMarkup += streamPath([{ x: lastConcX, y: finalManifoldY }, { x: lastConcX + GEO.outletStub, y: finalManifoldY }], COLORS.concentrate);
   
-  // Recycle loop drawing (Partial recycle from Pass 2)
-  if (hasRecycle) {
-    const p = passExits[recyclePass];
-    const branchY = p.concentrateY + 14; // Branch off cleanly above the flow text
-    const recycleDropX = p.concentrateX - 40; // Drop down on the LEFT side, between the passes
-    const recycleY = finalManifoldY + 40;
-    const startMixCx = 60 - 10; // Derived from x=60 initial value
-    const startMixCy = centerY + 13;
+  // Base coordinates for any recycle loops
+  const startMixCx = 60 - 10; 
+  const startMixCy = centerY + 13;
+
+  // Pass 2 inherent recycle (if 2-pass system)
+  if (hasPass2Recycle) {
+    const p = passExits[1];
+    const branchY = p.concentrateY + 14; 
+    const recycleDropX = p.concentrateX - 20; 
+    const recycleY = finalManifoldY + 30;
     
     fullMarkup += streamPath([
       { x: p.concentrateX, y: branchY },
@@ -5273,7 +5425,29 @@ function buildSVG() {
     ], COLORS.concentrate, 'flow-fast', true);
     
     if (state.calc.showFlows) {
-      fullMarkup += `<text x="${startMixCx + 8}" y="${recycleY - 6}" font-size="8.5" font-weight="500" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">Pass ${recyclePass + 1} Recycle (Partial)</text>`;
+      fullMarkup += `<text x="${startMixCx + 8}" y="${recycleY - 6}" font-size="8.5" font-weight="500" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">Pass 2 Recycle</text>`;
+    }
+  }
+
+  // User-configured Pass 1 Concentrate Recycle
+  if (hasUserRecycle) {
+    const p = passExits[0];
+    const branchY = p.concentrateY + 28; 
+    const recycleDropX = p.concentrateX - 40; 
+    const recycleY = finalManifoldY + (hasPass2Recycle ? 50 : 30);
+    
+    fullMarkup += streamPath([
+      { x: p.concentrateX, y: branchY },
+      { x: recycleDropX, y: branchY },
+      { x: recycleDropX, y: recycleY },
+      { x: startMixCx - 10, y: recycleY },
+      { x: startMixCx - 10, y: startMixCy + 10 }
+    ], COLORS.concentrate, 'flow-fast', true);
+    
+    if (state.calc.showFlows) {
+      const elRecycleRatio = document.getElementById('calc-recycle-ratio');
+      const recRatio = elRecycleRatio ? elRecycleRatio.value : "0";
+      fullMarkup += `<text x="${startMixCx - 2}" y="${recycleY - 6}" font-size="8.5" font-weight="500" fill="${COLORS.concentrate}" font-family="Fira Code, monospace">Pass 1 Recycle (${recRatio}%)</text>`;
     }
   }
 
@@ -5287,7 +5461,7 @@ function buildSVG() {
   }
 
   // Update bounds for viewBox sizing
-  sysMaxBottom = Math.max(sysMaxBottom, hasRecycle ? finalManifoldY + 60 : finalManifoldY + 40);
+  sysMaxBottom = Math.max(sysMaxBottom, finalManifoldY + (hasUserRecycle ? 70 : (hasPass2Recycle ? 50 : 30)));
   sysMaxTop = Math.min(sysMaxTop, last.permeateY - 40);
 
   const totalWidth = Math.max(last.permeateX, lastConcX) + GEO.outletStub + 150;
@@ -6452,4 +6626,77 @@ window.drawMechanismChart = function(totals) {
             }
         }
     });
+};
+
+window.exportWaterAnalysis = async function() {
+    const data = {};
+    const generalFields = ['ph', 'temperature', 'tds', 'tss', 'toc', 'sdi'];
+    generalFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) data[id] = el.value;
+    });
+
+    document.querySelectorAll('.ion-input').forEach(input => {
+        if (input.id) data[input.id] = input.value;
+    });
+
+    const jsonStr = JSON.stringify(data, null, 2);
+
+    try {
+        if ('showSaveFilePicker' in window) {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: 'water_analysis.json',
+                types: [{
+                    description: 'JSON Files',
+                    accept: {'application/json': ['.json']},
+                }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(jsonStr);
+            await writable.close();
+        } else {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonStr);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "water_analysis.json");
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error("Error saving file:", err);
+        }
+    }
+};
+
+window.importWaterAnalysis = function() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                Object.keys(data).forEach(key => {
+                    const el = document.getElementById(key);
+                    if (el) {
+                        el.value = data[key];
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+                if (typeof calculateChemistry === 'function') {
+                    calculateChemistry(true);
+                }
+            } catch (err) {
+                alert("Invalid JSON file");
+            }
+        };
+        reader.readAsText(file);
+    };
+    fileInput.click();
 };

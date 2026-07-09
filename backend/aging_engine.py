@@ -307,7 +307,7 @@ class AgingEngine:
 
                 hco3_conc = feed_ions.get("HCO3", 0) * cf
                 if hco3_conc > 0:
-                    sol_input["Alkalinity"] = f"{hco3_conc} as CaCO3"
+                    sol_input["Alkalinity"] = f"{hco3_conc} as HCO3"
 
                 sio2_conc = feed_ions.get("SiO2", 0) * cf
                 if sio2_conc > 0:

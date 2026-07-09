@@ -3,36 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PROJECT PACE</title>
+    <title>PACE — Permionics Analytical Calculation Engine</title>
+    <meta name="description" content="PACE: Permionics membrane process design and projection software for RO/NF system engineering.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Inter:wght@300..800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=46">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=47">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Normalise input + select heights: strip OS-native chrome from select */
-        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-        select {
-            height: 36px !important;
-            box-sizing: border-box !important;
-            padding: 0 0.5rem !important;
-        }
-        select {
-            -webkit-appearance: none !important;
-            -moz-appearance: none !important;
-            appearance: none !important;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 0.5rem center !important;
-            padding-right: 1.75rem !important;
-            cursor: pointer !important;
-        }
-        .user-info-field input,
-        .user-info-field select {
-            height: 28px !important;
-            font-size: 0.825rem !important;
-            padding: 0 0.4rem !important;
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            vertical-align: middle;
+            font-size: 18px;
+            line-height: 1;
         }
     </style>
 </head>
@@ -44,17 +29,18 @@
         <header class="top-header">
             <div class="header-left">
                 <img src="permionics_web.png?v=3" alt="Permionics Logo" class="brand-logo">
-                <h1>PACE</h1>
+                <span class="brand-title">Projection Software</span>
                 <button class="btn-membrane-db pace-locked-tab" id="membrane-db-btn" onclick="handleMembraneDbClick(event)">
                     <i class="fa-solid fa-lock pace-lock-icon"></i> Membrane Directory
                 </button>
             </div>
             <div class="header-right">
-                <button class="btn-primary" id="run-analysis-btn" style="display: none;">Run Analysis</button>
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" placeholder="Search parameters..." id="global-search-input">
+                </div>
+                <button class="btn-primary" id="run-analysis-btn">Run Analysis</button>
                 <div class="header-icons">
-                    <button class="icon-btn" id="theme-toggle-btn" title="Toggle Theme">
-                        <i class="fa-solid fa-moon"></i>
-                    </button>
                     <button class="icon-btn"><i class="fa-regular fa-bell"></i></button>
                     <button class="icon-btn"><i class="fa-solid fa-gear"></i></button>
                     <div class="user-profile" onclick="openUserInfoModal()" title="User Information">JD</div>
@@ -64,32 +50,35 @@
 
         <!-- Menu Bar Navigation -->
         <nav class="menu-bar">
-            <!-- File Tab (Always First) -->
-            <button class="menu-btn" id="file-tab-btn" style="margin-left: 0.5rem;">
-                <i class="fa-solid fa-file"></i> File Management
+            <!-- File Tab -->
+            <button class="menu-btn" id="file-tab-btn">
+                <i class="fa-solid fa-folder"></i> FILE
+                <i class="fa-solid fa-chevron-down" style="font-size:9px;opacity:0.7;"></i>
             </button>
-            
-            <!-- Project Details Tab — always first, always accessible -->
-            <button class="menu-btn" id="project-details-tab-btn" style="margin-left: 0.5rem;">
-                <i class="fa-solid fa-folder-open"></i> Project Details
+            <!-- Project Details Tab -->
+            <button class="menu-btn" id="project-details-tab-btn">
+                <i class="fa-solid fa-folder-open"></i> PROJECT INFO
             </button>
-
-            <!-- Lockable tabs — greyed out until project validated -->
+            <!-- Lockable tabs -->
             <button class="menu-btn pace-locked-tab" id="feed-data-tab-btn" title="Complete Project Details first">
-                <i class="fa-solid fa-lock pace-lock-icon"></i> Feed Data
+                <i class="fa-solid fa-database" style="color:#3D53D7;"></i>
+                <i class="fa-solid fa-lock pace-lock-icon"></i> FEED DATA
             </button>
             <button class="menu-btn pace-locked-tab" id="scaling-tab-btn" title="Complete Project Details first">
-                <i class="fa-solid fa-lock pace-lock-icon"></i> Scaling &amp; Fouling Analysis
+                <i class="fa-solid fa-triangle-exclamation" style="color:#f97316;"></i>
+                <i class="fa-solid fa-lock pace-lock-icon"></i> SCALING &amp; FOULING
             </button>
             <button class="menu-btn pace-locked-tab" id="process-tab-btn" title="Complete Project Details first">
-                <i class="fa-solid fa-lock pace-lock-icon"></i> Process Recommendation
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i>
+                <i class="fa-solid fa-lock pace-lock-icon"></i> PROCESS REC
             </button>
             <button class="menu-btn pace-locked-tab" id="calculation-tab-btn" title="Complete Project Details first">
-                <i class="fa-solid fa-lock pace-lock-icon"></i> Calculation
+                <i class="fa-solid fa-calculator" style="color:#3b82f6;"></i>
+                <i class="fa-solid fa-lock pace-lock-icon"></i> CALCULATION
             </button>
-
             <button class="menu-btn pace-locked-tab" id="report-tab-btn" title="Complete Project Details first">
-                <i class="fa-solid fa-lock pace-lock-icon"></i> Report
+                <i class="fa-solid fa-chart-bar" style="color:#ef4444;"></i>
+                <i class="fa-solid fa-lock pace-lock-icon"></i> REPORT
             </button>
         </nav>
 
@@ -104,62 +93,61 @@
             Please complete <strong style="color:#818cf8;">&nbsp;Project Details&nbsp;</strong> before accessing this module.
         </div>
 
-        <!-- â”€â”€ File Management in-page panel (shown when file-tab-btn is active) â”€â”€ -->
-        <div id="file-panel-view" style="display: none; flex-direction: column; gap: 1rem; padding: 0.5rem 0;">
-
-
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+        <!-- File Management in-page panel (shown when file-tab-btn is active) -->
+        <div id="file-panel-view" style="display: none; flex-direction: column; flex: 1; padding: 2rem; min-height: calc(100vh - 120px);">
+            <div style="width: 100%; height: 100%; display: grid; grid-template-columns: 2fr 1.5fr; gap: 2rem; flex: 1;">
+                
                 <!-- Project Actions Card -->
-                <section class="card" style="margin-bottom:0;">
-                    <div class="card-header">
-                        <h2 class="card-title">Project Actions</h2>
+                <section class="card" style="margin-bottom:0; display: flex; flex-direction: column; box-shadow: 0 8px 24px rgba(0,0,0,0.08);">
+                    <div class="card-header" style="padding: 1.25rem;">
+                        <h2 class="card-title" style="font-size: 1.1rem;"><i class="fa-solid fa-rocket" style="color: rgba(255,255,255,0.8);"></i> Project Actions</h2>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; padding: 1rem;">
-                        <button class="btn quick-action-btn new-proj" onclick="startNewProject()">
-                            <i class="fa-solid fa-file-circle-plus" style="font-size: 2rem; color: #10b981;"></i>
-                            <span style="font-weight: 600;">New Project</span>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; padding: 2rem; flex: 1;">
+                        <button class="btn quick-action-btn new-proj" onclick="startNewProject()" style="padding: 2rem 1rem; display: flex; flex-direction: column; justify-content: center;">
+                            <i class="fa-solid fa-file-circle-plus" style="font-size: 3.5rem; color: #10b981; margin-bottom: 1rem;"></i>
+                            <span style="font-weight: 700; font-size: 1.1rem;">New Project</span>
                         </button>
-                        <button class="btn quick-action-btn open-proj" onclick="loadProjectFromFile()">
-                            <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: #f59e0b;"></i>
-                            <span style="font-weight: 600;">Open Project</span>
+                        <button class="btn quick-action-btn open-proj" onclick="loadProjectFromFile()" style="padding: 2rem 1rem; display: flex; flex-direction: column; justify-content: center;">
+                            <i class="fa-solid fa-folder-open" style="font-size: 3.5rem; color: #f59e0b; margin-bottom: 1rem;"></i>
+                            <span style="font-weight: 700; font-size: 1.1rem;">Open Project</span>
                         </button>
-                        <button class="btn quick-action-btn save-proj" onclick="saveProjectDetails(event)">
-                            <i class="fa-solid fa-floppy-disk" style="font-size: 2rem; color: #3b82f6;"></i>
-                            <span style="font-weight: 600;">Save Project</span>
+                        <button class="btn quick-action-btn save-proj" onclick="saveProjectDetails(event)" style="padding: 2rem 1rem; display: flex; flex-direction: column; justify-content: center;">
+                            <i class="fa-solid fa-floppy-disk" style="font-size: 3.5rem; color: #3b82f6; margin-bottom: 1rem;"></i>
+                            <span style="font-weight: 700; font-size: 1.1rem;">Save Project</span>
                         </button>
-                        <button class="btn quick-action-btn export-water" onclick="exportWaterAnalysis()">
-                            <i class="fa-solid fa-file-export" style="font-size: 2rem; color: #8b5cf6;"></i>
-                            <span style="font-weight: 600;">Export Water Analysis</span>
+                        <button class="btn quick-action-btn export-water" onclick="exportWaterAnalysis()" style="padding: 2rem 1rem; display: flex; flex-direction: column; justify-content: center;">
+                            <i class="fa-solid fa-file-export" style="font-size: 3.5rem; color: #8b5cf6; margin-bottom: 1rem;"></i>
+                            <span style="font-weight: 700; font-size: 1.1rem;">Export Water Analysis</span>
                         </button>
                     </div>
                 </section>
 
                 <!-- Recent Files Card -->
-                <section class="card" style="margin-bottom:0;">
-                    <div class="card-header">
-                        <h2 class="card-title">Recent Files</h2>
+                <section class="card" style="margin-bottom:0; display: flex; flex-direction: column; box-shadow: 0 8px 24px rgba(0,0,0,0.08);">
+                    <div class="card-header" style="padding: 1.25rem;">
+                        <h2 class="card-title" style="font-size: 1.1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: rgba(255,255,255,0.8);"></i> Recent Files</h2>
                     </div>
-                    <div id="file-recent-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 350px; overflow-y: auto; padding: 1rem;">
+                    <div id="file-recent-list" style="display: flex; flex-direction: column; gap: 1rem; flex: 1; overflow-y: auto; padding: 2rem;">
                         <!-- Populated dynamically or static for UI -->
-                        <div class="recent-file-btn" onclick="alert('Loading Project_Seawater_RO.prt...')">
-                            <i class="fa-solid fa-file-lines" style="color:#6366f1; font-size:1.2rem; flex-shrink:0;"></i>
+                        <div class="recent-file-btn" onclick="alert('Loading Project_Seawater_RO.prt...')" style="padding: 1.5rem; border: 1px solid var(--color-outline-variant); border-radius: 8px; cursor: pointer; display: flex; gap: 1.5rem; align-items: center; transition: all 0.2s;">
+                            <i class="fa-solid fa-file-lines" style="color:#6366f1; font-size:2rem; flex-shrink:0;"></i>
                             <div style="flex:1; overflow:hidden;">
-                                <div class="file-title">Project_Seawater_RO.prt</div>
-                                <div style="font-size:0.75rem; color:#94a3b8;">Saved 2 hours ago</div>
+                                <div class="file-title" style="font-weight: 700; font-size: 1.1rem; color: var(--color-on-surface); margin-bottom: 0.3rem;">Project_Seawater_RO.prt</div>
+                                <div style="font-size:0.9rem; color: var(--color-on-surface-variant);">Saved 2 hours ago</div>
                             </div>
                         </div>
-                        <div class="recent-file-btn" onclick="alert('Loading Industrial_Wastewater_Project.prt...')">
-                            <i class="fa-solid fa-file-lines" style="color:#6366f1; font-size:1.2rem; flex-shrink:0;"></i>
+                        <div class="recent-file-btn" onclick="alert('Loading Industrial_Wastewater_Project.prt...')" style="padding: 1.5rem; border: 1px solid var(--color-outline-variant); border-radius: 8px; cursor: pointer; display: flex; gap: 1.5rem; align-items: center; transition: all 0.2s;">
+                            <i class="fa-solid fa-file-lines" style="color:#6366f1; font-size:2rem; flex-shrink:0;"></i>
                             <div style="flex:1; overflow:hidden;">
-                                <div class="file-title">Industrial_Wastewater_Project.prt</div>
-                                <div style="font-size:0.75rem; color:#94a3b8;">Saved 1 day ago</div>
+                                <div class="file-title" style="font-weight: 700; font-size: 1.1rem; color: var(--color-on-surface); margin-bottom: 0.3rem;">Industrial_Wastewater_Project.prt</div>
+                                <div style="font-size:0.9rem; color: var(--color-on-surface-variant);">Saved 1 day ago</div>
                             </div>
                         </div>
-                        <div class="recent-file-btn" onclick="alert('Loading Tap_Water_Projection.prt...')">
-                            <i class="fa-solid fa-file-lines" style="color:#6366f1; font-size:1.2rem; flex-shrink:0;"></i>
+                        <div class="recent-file-btn" onclick="alert('Loading Tap_Water_Projection.prt...')" style="padding: 1.5rem; border: 1px solid var(--color-outline-variant); border-radius: 8px; cursor: pointer; display: flex; gap: 1.5rem; align-items: center; transition: all 0.2s;">
+                            <i class="fa-solid fa-file-lines" style="color:#6366f1; font-size:2rem; flex-shrink:0;"></i>
                             <div style="flex:1; overflow:hidden;">
-                                <div class="file-title">Tap_Water_Projection.prt</div>
-                                <div style="font-size:0.75rem; color:#94a3b8;">Saved 3 days ago</div>
+                                <div class="file-title" style="font-weight: 700; font-size: 1.1rem; color: var(--color-on-surface); margin-bottom: 0.3rem;">Tap_Water_Projection.prt</div>
+                                <div style="font-size:0.9rem; color: var(--color-on-surface-variant);">Saved 3 days ago</div>
                             </div>
                         </div>
                     </div>
@@ -168,11 +156,15 @@
         </div>
 
         <!-- Project Details in-page panel (shown when project-details-tab-btn is active) -->
-        <div id="project-details-panel-view" style="display: none; flex-direction: column; padding: 0.5rem 0;">
+        <div id="project-details-panel-view" style="display: none; flex-direction: column; padding: 16px;">
 
-            <!-- Header Row -->
-            <div style="display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 1.5rem;">
-                <button class="btn panel-action-btn btn-clear" onclick="clearProjectModal()" style="border-radius: 4px; border: 1.5px solid #ef4444; color: #ef4444; background: transparent; padding: 0.6rem 1.2rem;">
+            <!-- Page Title -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                <div class="page-title-block" style="margin-bottom: 0;">
+                    <h1 class="page-title">Project Information</h1>
+                    <p class="page-subtitle">Manage project identity, case revisions, and authorship details.</p>
+                </div>
+                <button class="btn-danger" onclick="clearProjectModal()" style="padding: 8px 16px; white-space: nowrap; flex-shrink: 0;">
                     <i class="fa-solid fa-trash-can"></i> Delete Current Project
                 </button>
             </div>
@@ -530,72 +522,19 @@
         </div>
 
         <!-- Scaling & Fouling Analysis View -->
-        <div class="dashboard" id="scaling-panel-view" style="display: none; grid-template-columns: 1fr 450px; gap: 1.5rem;">
+        <div class="dashboard" id="scaling-panel-view" style="display: none; grid-template-columns: 1fr 450px; gap: 16px; padding: 16px;">
 
-            <main style="display: flex; flex-direction: column; gap: 1rem; height: 100%;">
+            <main style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="page-title-block" style="margin-bottom: 1rem;">
+                    <h1 style="color: var(--text-primary); font-size: 1.5rem; margin: 0;">Scaling & Fouling Analysis</h1>
+                    <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0;">Evaluate saturation indices for feed water chemistry.</p>
+                </div>
                 <section class="card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0;">
-                    <div class="card-header" style="background-color: #313d96; color: white; border-radius: 8px 8px 0 0; padding: 1.25rem;">
-                        <h2 class="card-title" style="color: white; font-weight: 700; text-transform: uppercase; font-size: 1.1rem; letter-spacing: 0.5px;">SCALING & FOULING INDICES</h2>
+                    <div class="card-header">
+                        <h2 class="card-title" style="color: white; font-weight: 700; text-transform: uppercase; font-size: 1.1rem; letter-spacing: 0.5px;"><i class="fa-solid fa-triangle-exclamation" style="color: rgba(255,255,255,0.8);"></i> SCALING & FOULING INDICES</h2>
                     </div>
                     <div class="card-content" style="flex: 1; display: flex; flex-direction: column;">
-                        <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Saturation Indices (SI)</h3>
-                        <style>
-                            .si-grid {
-                                display: grid;
-                                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                                gap: 1.25rem;
-                                margin-bottom: 2rem;
-                            }
-                            .si-card {
-                                background: var(--input-bg);
-                                border: 1px solid var(--card-border);
-                                border-radius: 8px;
-                                padding: 1.25rem;
-                                display: flex;
-                                flex-direction: column;
-                                justify-content: space-between;
-                                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                                position: relative;
-                                overflow: hidden;
-                            }
-                            .si-card:hover {
-                                transform: translateY(-2px);
-                                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15), 0 2px 4px -1px rgba(0,0,0,0.1);
-                                border-color: var(--accent-color);
-                            }
-                            .si-label {
-                                font-size: 0.85rem;
-                                color: var(--text-secondary);
-                                font-weight: 600;
-                                display: block;
-                                margin-bottom: 0.5rem;
-                            }
-                            .si-value {
-                                font-size: 1.25rem;
-                                font-weight: 700;
-                                color: var(--text-primary);
-                                font-family: inherit;
-                            }
-                            .si-icon {
-                                opacity: 0.7;
-                                color: var(--accent-color);
-                            }
-                            .si-bar-container {
-                                width: 100%;
-                                height: 6px;
-                                background: var(--card-border);
-                                border-radius: 3px;
-                                margin-top: 0.75rem;
-                                overflow: hidden;
-                            }
-                            .si-bar {
-                                height: 100%;
-                                width: 0%;
-                                transition: width 0.5s ease, background-color 0.5s ease;
-                                border-radius: 3px;
-                            }
-                        </style>
+                        <h3 style="margin-top: 0; margin-bottom: 12px; color: var(--color-on-surface-variant); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;">Saturation Indices (Feed Water)</h3>
 
                         <div class="si-grid">
                             <div class="si-card">
@@ -661,8 +600,8 @@
 
             <aside class="results-panel" style="height: 100%;">
                 <section class="card" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 0; height: 100%;">
-                    <div class="card-header" style="background-color: #313d96; color: white; border-radius: 8px 8px 0 0; padding: 1.25rem; margin-bottom: 0;">
-                        <h2 class="card-title" style="color: white; font-weight: 700; text-transform: uppercase; font-size: 1.1rem; letter-spacing: 0.5px;">SATURATION VISUALIZATION</h2>
+                    <div class="card-header">
+                        <h2 class="card-title"><i class="fa-solid fa-chart-bar" style="color: rgba(255,255,255,0.8);"></i> SATURATION VISUALIZATION</h2>
                     </div>
                     <div class="card-content" style="display: flex; flex-direction: column; gap: 1.5rem; padding: 1.5rem;">
                         <!-- Custom Legend -->
@@ -705,8 +644,8 @@
         </div>
 
         <!-- Process Recommendation View -->
-        <div class="dashboard" id="process-dashboard-view" style="display: none; grid-template-columns: 1fr 350px; gap: 1.5rem;">
-            <main class="data-entry" style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="dashboard" id="process-dashboard-view" style="display: none; grid-template-columns: 1fr 350px; gap: 16px; padding: 16px;">
+            <main class="data-entry" style="display: flex; flex-direction: column; gap: 12px;">
                 <!-- Top Row: Config and Confidence -->
                 <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem;">
                     <!-- Primary Config Display -->
@@ -814,9 +753,9 @@
 
         
         <!-- Calculation Panel View -->
-        <div class="dashboard" id="calculation-panel-view" style="display: none; grid-template-columns: 350px 1fr; gap: 1rem;">
+        <div class="dashboard" id="calculation-panel-view" style="display: none; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px;">
             <!-- Left Column: Settings -->
-            <aside class="data-entry" style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; max-height: calc(100vh - 140px); padding-right: 0.3rem;">
+            <aside class="data-entry" style="display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: calc(100vh - 140px); padding-right: 4px;">
                 <section class="card">
                     <div class="card-header">
                         <h2 class="card-title">System Configuration</h2>
@@ -1410,6 +1349,34 @@
                                     </table>
                                 </div>
                             </section>
+
+                            <!-- PHREEQC Concentrate Scaling Risks -->
+                            <section class="card" id="calc-si-card" style="display:none; margin-top: 1rem;">
+                                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <h2 class="card-title"><i class="fa-solid fa-flask-vial" style="color:var(--primary-color); margin-right:0.5rem;"></i>Concentrate Scaling Risks (PHREEQC)</h2>
+                                    <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; color:var(--text-secondary);">
+                                        Equilibrium Concentrate pH:&nbsp;
+                                        <span id="calc-conc-ph" style="font-weight:700; font-size:1rem; color:var(--primary-color);">—</span>
+                                    </div>
+                                </div>
+                                <div class="card-content" style="overflow-x:auto; padding:0;">
+                                    <table class="report-table calc-element-table" style="width:100%; border-collapse:collapse;">
+                                        <thead>
+                                            <tr>
+                                                <th style="text-align:left;">Mineral</th>
+                                                <th>Formula</th>
+                                                <th>SI (Conc.)</th>
+                                                <th>Risk Level</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="calc-si-tbody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div style="padding:0.6rem 1rem; font-size:0.7rem; color:var(--text-secondary); border-top:1px solid var(--border-color);">
+                                    SI = log₁₀(Ion Activity Product / Ksp). SI &gt; 0 indicates supersaturation. PHREEQC self-equilibrates concentrate chemistry — pH shown is thermodynamically computed, not assumed.
+                                </div>
+                            </section>
                         </div>
 
                         <!-- SUBTAB: Economics -->
@@ -1704,17 +1671,17 @@
             </main>
         </div>
 
-        <div class="dashboard" id="report-panel-view" style="display: none; grid-template-columns: 1fr; gap: 0.6rem;">
-            <main class="data-entry" style="display: flex; flex-direction: column; gap: 0.6rem; grid-column: span 1;">
-                <section class="card">
+        <div id="report-panel-view" style="display: none; flex-direction: column; flex: 1;">
+            <main style="display: flex; flex-direction: column; flex: 1;">
+                <section class="card" style="margin: 16px; margin-bottom: 8px;">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <h2 class="card-title">Comprehensive Project Summary Report</h2>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn" id="wave-report-generate-btn" style="width: auto; padding: 0.35rem 1.2rem; font-size: 0.85rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <h2 class="card-title"><i class="fa-solid fa-file-lines" style="color: rgba(255,255,255,0.8);"></i> COMPREHENSIVE PROJECT SUMMARY REPORT</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-secondary" id="wave-report-generate-btn" style="background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); color: #ffffff; font-size: 11px;">
                                 <i class="fa-solid fa-gears"></i> Generate Preview
                             </button>
-                            <button class="btn" id="wave-report-download-btn" style="width: auto; padding: 0.35rem 1.2rem; font-size: 0.85rem; background: #c0392b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; display: none; align-items: center; gap: 0.5rem;">
-                                <i class="fa-solid fa-download"></i> Download
+                            <button class="btn-secondary" id="wave-report-download-btn" style="background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); color: #ffffff; font-size: 11px; display: none;">
+                                <i class="fa-solid fa-download"></i> Download PDF
                             </button>
                         </div>
                     </div>
@@ -1731,8 +1698,13 @@
             </main>
         </div>
 
-        <div class="dashboard" id="feed-dashboard-view" style="display: none;">
-            <main class="data-entry">
+        <div id="feed-dashboard-view" style="display: none; padding: 2rem; flex-direction: column; gap: 1.5rem; flex: 1;">
+            <div class="page-title-block" style="margin-bottom: 0;">
+                <h1 class="page-title">Feed Water Analysis</h1>
+                <p class="page-subtitle">Define the ionic composition, physical parameters, and fouling indicators of the source water.</p>
+            </div>
+            <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.5rem; align-items: start; flex: 1;">
+                <main class="data-entry" style="display: grid !important; grid-template-columns: 1fr 1fr; gap: 1.5rem; flex-direction: unset;">
                 <!-- Physical Parameters -->
                 <section class="card">
                     <div class="card-header">
@@ -1820,7 +1792,8 @@
                             <button class="btn" style="background: rgba(255, 60, 60, 0.2); border: 1px solid rgba(255, 60, 60, 0.4); color: var(--text-primary); padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="clearIonicData()">Clear Data</button>
                         </div>
                     </div>
-                    <div class="table-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div style="padding: 1.5rem;">
+                        <div class="table-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                         <!-- Column 1 -->
                         <div>
                             <div style="font-weight: 700; color: #2563eb; font-size: 0.8rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; text-transform: uppercase;">
@@ -1910,8 +1883,8 @@
                                     <td><span id="so4-caco3">—</span></td>
                                 </tr>
                                 <tr>
-                                    <td>Total Alkalinity (as CaCO<sub>3</sub>)</td>
-                                    <td><input type="number" id="hco3" class="ion-input anion" data-mw="50.04" data-z="1" value="180.0" step="any"></td>
+                                    <td>Bicarbonate (HCO<sub>3</sub><sup>-</sup>)</td>
+                                    <td><input type="number" id="hco3" class="ion-input anion" data-mw="61.02" data-z="1" value="180.0" step="any"></td>
                                     <td><span id="hco3-meq">—</span></td>
                                     <td><span id="hco3-caco3">—</span></td>
                                 </tr>
@@ -1950,17 +1923,18 @@
                         </div>
                     </div>
                     <!-- Unified Totals Row -->
-                    <div style="margin-top: 1rem; padding: 1rem 1.5rem; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; justify-content: flex-end; align-items: center; gap: 3rem; border: 1px solid rgba(0, 0, 0, 0.05);">
-                        <div style="font-weight: 700; color: var(--text-secondary); text-transform: uppercase; font-size: 0.85rem;">Totals</div>
+                    <div style="margin-top: 1rem; padding: 1rem 1.5rem; background: var(--color-surface-container-high); border-radius: 8px; display: flex; justify-content: flex-end; align-items: center; gap: 3rem; border: 1px solid var(--color-outline-variant);">
+                        <div style="font-weight: 700; color: var(--color-on-surface-variant); text-transform: uppercase; font-size: 0.85rem;">Totals</div>
                         <div style="font-weight: 700;">mg/L: <span id="total-mgl" style="color: #60a5fa; margin-left: 0.5rem;">0.00</span></div>
                         <div style="font-weight: 700;">meq/L: <span id="total-meq" style="color: #60a5fa; margin-left: 0.5rem;">0.0000</span></div>
                         <div style="font-weight: 700;">ppm CaCO<sub>3</sub>: <span id="total-caco3" style="color: #60a5fa; margin-left: 0.5rem;">0.00</span></div>
+                    </div>
                     </div>
                 </section>
             </main>
 
             <!-- Results Sidebar -->
-            <aside class="results-panel">
+            <aside class="results-panel" style="display: flex; flex-direction: column; gap: 1.5rem;">
                 <!-- System Units Card -->
                 <section class="card" style="margin-bottom: 0.75rem;">
                     <div class="card-header">
@@ -2041,9 +2015,10 @@
                     </div>
                 </section>
             </aside>
+            </div>
         </div>
     </div>
-    <script src="script.js?v=49"></script>
+    <script src="script.js?v=59"></script>
 <div id="global-loader" class="pace-loader--overlay">
   <div class="pace-loader" role="status" aria-live="polite" aria-label="Loading">
     <svg width="180" height="76" viewBox="0 0 420 170" role="img" aria-label="Membrane vessel filling animation with wavy water flow">
@@ -2320,6 +2295,21 @@
             </div>
         </div>
     </div>
+
+<!-- Sticky Footer Status Bar -->
+<footer class="pace-footer" id="pace-main-footer">
+    <div class="footer-status">
+        <div class="status-dot" id="footer-status-dot"></div>
+        <span class="status-label">PROJECT STATUS: <span id="footer-project-status" style="font-weight:400;text-transform:none;">Ready</span></span>
+        <div class="status-divider"></div>
+        <span class="status-saved">Last Saved: <span id="footer-last-saved">Not yet saved</span></span>
+    </div>
+    <div class="footer-actions">
+        <button class="btn-secondary" onclick="window.location.reload()"><i class="fa-solid fa-rotate"></i> Reset All</button>
+        <button class="btn-secondary" onclick="loadProjectFromFile()"><i class="fa-solid fa-folder-open"></i> Load Project</button>
+        <button class="btn-primary" id="footer-save-btn" onclick="saveProjectDetails(event)"><i class="fa-solid fa-floppy-disk"></i> Save Project</button>
+    </div>
+</footer>
 
 </body>
 </html>

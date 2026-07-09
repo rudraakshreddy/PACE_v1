@@ -6,3 +6,4 @@ matplotlib
 numpy
 python-docx
 pymupdf
+docx2pdf

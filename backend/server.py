@@ -216,7 +216,7 @@ def calculate_scaling(data: FeedWaterData):
             'N(-3)': f"{data.ammonium} as NH4",
             'Cl': data.chloride,
             'S(6)': f"{data.sulfate} as SO4",
-            'Alkalinity': f"{data.bicarbonate} as CaCO3",
+            'Alkalinity': f"{data.bicarbonate} as HCO3",
             'N(5)': f"{data.nitrate} as NO3",
             'Sr': data.strontium,
             'F': data.fluoride,
@@ -279,15 +279,9 @@ def auto_balance(data: AutoBalanceInput):
         mw_f, z_f = 19.00, 1
         mw_po4, z_po4 = 94.97, 3
         
-        # Alkalinity input (bicarbonate field) is in mg/L as CaCO3
-        alk_meq = data.bicarbonate / 50.04
-        if data.ph < 8.3:
-            hco3_meq = alk_meq
-            co3_meq = 0.0
-        else:
-            fraction_co3 = 10**(data.ph - 10.3) / (1 + 10**(data.ph - 10.3))
-            co3_meq = alk_meq * fraction_co3
-            hco3_meq = alk_meq - co3_meq
+        # True HCO3- and CO3-- input
+        hco3_meq = (data.bicarbonate / mw_hco3) * z_hco3
+        co3_meq = (data.carbonate / mw_co3) * z_co3
             
         cat_meq = (
             (data.calcium / mw_ca) * z_ca +
@@ -401,6 +395,54 @@ def calculate_system(data: SystemCalcInput):
             result = engine.calculate_system_with_recycle(input_dict)
         else:
             result = engine.calculate_system(input_dict)
+
+        # ── Compute PHREEQC concentrate SI for all calculation paths ─────────
+        # Let PHREEQC self-equilibrate (no pH specified) so it computes the
+        # thermodynamically exact concentrate pH and Saturation Indices.
+        try:
+            ro_main = result.get("ro_results") or result.get("pass1_results") or result
+            conc_ions = ro_main.get("summary", {}).get("conc_ions", {})
+            fw = data.feed_water
+            temp_c = float(fw.get("temperature", 25.0))
+            if conc_ions:
+                sol_input = {
+                    'units': 'mg/L',
+                    'temp': temp_c,
+                    'Ca':    conc_ions.get("Ca",   0),
+                    'Mg':    conc_ions.get("Mg",   0),
+                    'Na':    conc_ions.get("Na",   0),
+                    'K':     conc_ions.get("K",    0),
+                    'N(-3)': f"{conc_ions.get('NH4', 0)} as NH4",
+                    'Cl':    conc_ions.get("Cl",   0),
+                    'S(6)':  f"{conc_ions.get('SO4', 0)} as SO4",
+                    'Alkalinity': f"{conc_ions.get('HCO3', 0)} as HCO3",
+                    'N(5)':  f"{conc_ions.get('NO3', 0)} as NO3",
+                    'Sr':    conc_ions.get("Sr",   0),
+                    'F':     conc_ions.get("F",    0),
+                    'Si':    f"{conc_ions.get('SiO2', 0)} as SiO2",
+                    'Ba':    conc_ions.get("Ba",   0),
+                    'Al':    conc_ions.get("Al",   0),
+                    'Fe':    conc_ions.get("Fe",   0),
+                    'Mn':    conc_ions.get("Mn",   0),
+                    'P':     f"{conc_ions.get('PO4', 0)} as PO4",
+                }
+                sol = pp.add_solution(sol_input)
+                result["concentrate_ph"] = round(sol.pH, 2)
+                result["concentrate_si"] = {
+                    "Calcite":   round(sol.si("Calcite"),   3),
+                    "Aragonite": round(sol.si("Aragonite"), 3),
+                    "Dolomite":  round(sol.si("Dolomite"),  3),
+                    "Gypsum":    round(sol.si("Gypsum"),    3),
+                    "Anhydrite": round(sol.si("Anhydrite"), 3),
+                    "Barite":    round(sol.si("Barite"),    3),
+                    "Celestite": round(sol.si("Celestite"), 3),
+                    "Fluorite":  round(sol.si("Fluorite"),  3),
+                    "SiO2(a)":   round(sol.si("SiO2(a)"),  3),
+                }
+                sol.forget()
+        except Exception as e:
+            print("PHREEQC concentrate SI error in calculate-system:", e)
+
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -857,15 +899,19 @@ def _run_projection_core(
     print(f"  baseline Q0  = {baseline_ro.get('summary', {}).get('perm_flow', '?')}")
     print(f"==========================================\n")
 
-    # Calculate bulk scaling indices for Year 0 concentrate
+    # ── Concentrate SI (PHREEQC self-equilibration — no manual pH input) ───
+    # We intentionally omit 'pH' from the solution dict so that PHREEQC solves
+    # the full carbonate equilibrium from the concentrate alkalinity and returns
+    # the thermodynamically exact concentrate pH via sol.pH.
     bulk_si = None
+    concentrate_si = None
+    concentrate_ph = None
     try:
         conc_ions = baseline_ro.get("summary", {}).get("conc_ions", {})
         if conc_ions:
-            sol = pp.add_solution({
+            sol_input = {
                 'units': 'mg/L',
                 'temp': temp_c,
-                'pH': ph,
                 'Ca': conc_ions.get("Ca", 0),
                 'Mg': conc_ions.get("Mg", 0),
                 'Na': conc_ions.get("Na", 0),
@@ -873,7 +919,8 @@ def _run_projection_core(
                 'N(-3)': f"{conc_ions.get('NH4', 0)} as NH4",
                 'Cl': conc_ions.get("Cl", 0),
                 'S(6)': f"{conc_ions.get('SO4', 0)} as SO4",
-                'Alkalinity': f"{conc_ions.get('HCO3', 0)} as CaCO3",
+                # Use alkalinity expressed as HCO3 mg/L for correct carbonate equilibrium
+                'Alkalinity': f"{conc_ions.get('HCO3', 0)} as HCO3",
                 'N(5)': f"{conc_ions.get('NO3', 0)} as NO3",
                 'Sr': conc_ions.get("Sr", 0),
                 'F': conc_ions.get("F", 0),
@@ -883,16 +930,31 @@ def _run_projection_core(
                 'Fe': conc_ions.get("Fe", 0),
                 'Mn': conc_ions.get("Mn", 0),
                 'P': f"{conc_ions.get('PO4', 0)} as PO4"
-            })
+            }
+            sol = pp.add_solution(sol_input)
+            # Read back the equilibrated pH — PHREEQC solved this from the carbonate system
+            concentrate_ph = round(sol.pH, 2)
+            concentrate_si = {
+                "Calcite":   round(sol.si("Calcite"),   3),
+                "Aragonite": round(sol.si("Aragonite"), 3),
+                "Dolomite":  round(sol.si("Dolomite"),  3),
+                "Gypsum":    round(sol.si("Gypsum"),    3),
+                "Anhydrite": round(sol.si("Anhydrite"), 3),
+                "Barite":    round(sol.si("Barite"),    3),
+                "Celestite": round(sol.si("Celestite"), 3),
+                "Fluorite":  round(sol.si("Fluorite"),  3),
+                "SiO2(a)":   round(sol.si("SiO2(a)"),   3),
+            }
+            # Legacy compact SI for physics engine scaling model
             bulk_si = {
-                "calcite": sol.si("Calcite"),
-                "gypsum": sol.si("Gypsum"),
-                "barite": sol.si("Barite"),
-                "silica": sol.si("SiO2(a)")
+                "calcite": concentrate_si["Calcite"],
+                "gypsum":  concentrate_si["Gypsum"],
+                "barite":  concentrate_si["Barite"],
+                "silica":  concentrate_si["SiO2(a)"],
             }
             sol.forget()
     except Exception as e:
-        print("Error calculating bulk concentrate SI in server.py:", e)
+        print("Error calculating concentrate SI in server.py:", e)
 
     physics_results = phys_engine.run_physics_projection(
         baseline_ro_result  = physics_baseline_ro,
@@ -996,6 +1058,8 @@ def _run_projection_core(
         "baseline":        baseline,
         "baseline_ro":     baseline_ro,
         "physics_results": physics_results,
+        "concentrate_si":  concentrate_si,
+        "concentrate_ph":  concentrate_ph,
     }
 
 
@@ -1151,6 +1215,8 @@ def calculate_system_physics(data: PhysicsCalcInput):
 
         result["physics_results"] = physics_results
         result["physics_selected_year"] = selected_year
+        result["concentrate_si"] = core.get("concentrate_si")
+        result["concentrate_ph"] = core.get("concentrate_ph")
 
         return result
 
