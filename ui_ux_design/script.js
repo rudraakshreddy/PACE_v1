@@ -4563,9 +4563,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <td style="text-align:left; color:${color};">
                                     <i class="fa-solid fa-${icon}"></i> ${w.type}
                                 </td>
-                                <td>${w.limit !== undefined ? w.limit : '-'}</td>
-                                <td>${w.value !== undefined ? w.value.toFixed(2) : (w.estimate !== undefined ? w.estimate.toFixed(2) : '-')}</td>
-                                <td><span style="padding:0.2rem 0.5rem; border-radius:4px; font-size:0.7rem; background:${color}; color:white;">${st}</span></td>
+                                <td style="text-align:center;">${w.limit !== undefined ? w.limit : '-'}</td>
+                                <td style="text-align:center;">${w.value !== undefined ? w.value.toFixed(2) : (w.estimate !== undefined ? w.estimate.toFixed(2) : '-')}</td>
+                                <td style="text-align:center;"><span style="padding:0.2rem 0.5rem; border-radius:4px; font-size:0.7rem; background:${color}; color:white;">${st}</span></td>
                             </tr>
                             `;
                         }).join('');
