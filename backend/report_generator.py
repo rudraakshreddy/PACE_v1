@@ -1544,4 +1544,5 @@ class ReportGenerator:
         _add_footer(doc, proj, self.today)
 
         doc.save(output_path)
+        plt.close('all')
         return output_path

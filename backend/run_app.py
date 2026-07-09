@@ -31,8 +31,10 @@ def open_browser():
 
 if __name__ == "__main__":
     print("Starting PACE Application...")
-    # Delay browser opening slightly to let server start
-    Timer(1.5, open_browser).start()
+    # Delay browser opening slightly to let server start, but skip on Railway/Cloud
+    if not os.environ.get("RAILWAY_PROJECT_ID") and not os.environ.get("PORT"):
+        Timer(1.5, open_browser).start()
     
-    # Run the server (localhost only)
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
+    # Run the server
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

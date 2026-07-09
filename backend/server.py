@@ -32,6 +32,11 @@ class BasicAuthASGIMiddleware:
             return
 
         headers = scope.get("headers", [])
+        # Only apply authentication to API endpoints
+        if not scope.get("path", "").startswith("/api/"):
+            await self.app(scope, receive, send)
+            return
+
         auth_header = None
         for name, value in headers:
             if name == b"authorization":
@@ -45,7 +50,9 @@ class BasicAuthASGIMiddleware:
                 if auth_type.lower() == "basic":
                     decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
                     username, password = decoded_creds.split(":", 1)
-                    if username == "user" and password == "password123":
+                    expected_user = os.environ.get("API_USERNAME", "user")
+                    expected_pass = os.environ.get("API_PASSWORD", "password123")
+                    if username == expected_user and password == expected_pass:
                         authorized = True
             except Exception:
                 pass
@@ -61,7 +68,6 @@ class BasicAuthASGIMiddleware:
             "status": 401,
             "headers": [
                 (b"content-type", b"text/plain"),
-                (b"www-authenticate", b'Basic realm="PACE Access"'),
             ]
         })
         await send({
@@ -203,6 +209,10 @@ class SystemCalcInput(BaseModel):
 @app.get("/")
 def read_root():
     return RedirectResponse(url="/index.html")
+
+@app.post("/api/verify-auth")
+def verify_auth():
+    return {"status": "success"}
 
 @app.post("/api/calculate-scaling")
 def calculate_scaling(data: FeedWaterData):
@@ -545,7 +555,6 @@ def list_membranes():
 def generate_calc_report(data: SystemCalcInput):
     try:
         import tempfile, os
-        from docx2pdf import convert as docx2pdf_convert
 
         engine = SystemEngine()
         input_dict = data.dict()
@@ -586,12 +595,22 @@ def generate_calc_report(data: SystemCalcInput):
         reporter = ReportGenerator()
         reporter.generate_calculation_report(result, tmp_docx.name)
 
-        # Convert docx → PDF in a fresh subprocess to avoid Windows COM thread issues in FastAPI
+        # Convert docx → PDF using libreoffice (Linux/Docker compatible) or fallback to docx2pdf (Windows local)
         import subprocess
-        script = f"from docx2pdf import convert; convert(r'{tmp_docx.name}', r'{tmp_pdf}')"
-        res = subprocess.run(["python", "-c", script], capture_output=True, text=True)
-        if res.returncode != 0:
-            raise Exception(f"PDF conversion failed: {res.stderr}")
+        import sys
+        
+        temp_dir = tempfile.gettempdir()
+        if sys.platform == "win32":
+            # Fallback for local Windows testing without Docker
+            script = f"from docx2pdf import convert; convert(r'{tmp_docx.name}', r'{tmp_pdf}')"
+            res = subprocess.run(["python", "-c", script], capture_output=True, text=True)
+            if res.returncode != 0:
+                raise Exception(f"Windows PDF conversion failed: {res.stderr}")
+        else:
+            # Production Linux Docker environment using LibreOffice
+            res = subprocess.run(["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, tmp_docx.name], capture_output=True, text=True)
+            if res.returncode != 0:
+                raise Exception(f"Linux PDF conversion failed: {res.stderr}")
 
         # Add Watermark for copyright purposes
         try:
@@ -641,11 +660,12 @@ def generate_calc_report(data: SystemCalcInput):
         except Exception:
             pass
 
+        from fastapi.background import BackgroundTask
         return FileResponse(
             path=tmp_pdf,
             filename="PACE_Calculation_Report.pdf",
             media_type="application/pdf",
-            background=None
+            background=BackgroundTask(os.unlink, tmp_pdf)
         )
     except Exception as e:
         import traceback
@@ -1299,4 +1319,6 @@ def calculate_system_physics(data: PhysicsCalcInput):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

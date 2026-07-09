@@ -1,5 +1,44 @@
-const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : 'http://127.0.0.1:8000';
+const API_BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : window.location.origin;
 window.isProjectDirty = false;
+
+// Login state management
+window.addEventListener('DOMContentLoaded', () => {
+    const authData = localStorage.getItem('pace_auth');
+    if (!authData) {
+        document.getElementById('login-overlay').style.display = 'flex';
+    } else {
+        document.getElementById('login-overlay').style.display = 'none';
+    }
+});
+
+window.handleLoginSubmit = async function(e) {
+    e.preventDefault();
+    const u = document.getElementById('login-username').value;
+    const p = document.getElementById('login-password').value;
+    const encoded = btoa(u + ':' + p);
+    
+    document.getElementById('login-submit-btn').innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Signing in...';
+    document.getElementById('login-error').style.display = 'none';
+    
+    try {
+        const res = await fetch(`${API_BASE}/api/verify-auth`, {
+            method: 'POST',
+            headers: { 'Authorization': `Basic ${encoded}` }
+        });
+        
+        if (res.ok) {
+            localStorage.setItem('pace_auth', encoded);
+            document.getElementById('login-overlay').style.display = 'none';
+        } else {
+            document.getElementById('login-error').style.display = 'block';
+        }
+    } catch (err) {
+        document.getElementById('login-error').innerText = 'Network error connecting to server.';
+        document.getElementById('login-error').style.display = 'block';
+    } finally {
+        document.getElementById('login-submit-btn').innerHTML = 'Sign In';
+    }
+};
 
 window.showLoader = function() {
     const loader = document.getElementById('global-loader');
@@ -29,17 +68,19 @@ window.fetch = async function(...args) {
     if (isCalc && window.showLoader) window.showLoader();
     const startTime = Date.now();
     try {
-        if (url && typeof url === 'string' && (url.includes('localhost:8000') || url.includes('/api/'))) {
-            const opts = args[1] || {};
-            opts.headers = opts.headers || {};
-            
-            // Avoid overwriting if it's a Headers object
-            if (opts.headers instanceof Headers) {
-                opts.headers.set('Authorization', 'Basic dXNlcjpwYXNzd29yZDEyMw==');
-            } else {
-                opts.headers['Authorization'] = 'Basic dXNlcjpwYXNzd29yZDEyMw==';
+        if (url && typeof url === 'string' && (url.includes('localhost:8000') || url.includes('/api/') || url.includes('robust-integrity'))) {
+            const auth = localStorage.getItem('pace_auth');
+            if (auth) {
+                const opts = args[1] || {};
+                opts.headers = opts.headers || {};
+                
+                if (opts.headers instanceof Headers) {
+                    opts.headers.set('Authorization', `Basic ${auth}`);
+                } else {
+                    opts.headers['Authorization'] = `Basic ${auth}`;
+                }
+                args[1] = opts;
             }
-            args[1] = opts;
         }
         return await originalFetch(...args);
     } finally {
