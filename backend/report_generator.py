@@ -757,6 +757,36 @@ class ReportGenerator:
             print(f"SVG Render error: {e}")
             return None
 
+    def _page_uf_overview(self, doc, sr):
+        uf_results = sr.get('uf_results')
+        if not uf_results: return
+
+        _heading(doc, 'UF Summary Report', size=16)
+
+        overview = uf_results.get('overview', {})
+        op_cond = uf_results.get('operating_conditions', {})
+        
+        ud = sr.get('units', {})
+        flow_lbl = lbl_flow(ud)
+        press_lbl = lbl_press(ud)
+        flux_lbl = lbl_flux(ud)
+
+        _heading(doc, 'UF System Overview', size=11)
+        _prop_table(doc, [
+            ('UF Module Model',             overview.get('module_type', '—')),
+            ('Total Modules',               str(overview.get('total_modules', '—'))),
+            ('Gross Feed Flow',             f"{conv_flow(overview.get('gross_feed_m3h', 0), ud):.1f} {flow_lbl}"),
+            ('Net Product Flow',            f"{conv_flow(overview.get('net_product_m3h', 0), ud):.1f} {flow_lbl}"),
+            ('Recovery',                    f"{overview.get('recovery_pct', 0):.1f} %"),
+            ('Filtration Flux',             f"{conv_flux(op_cond.get('filtration_flux_lmh', 0), ud):.1f} {flux_lbl}"),
+            ('Design TMP',                  f"{conv_press(overview.get('tmp_design_bar', 0), ud):.2f} {press_lbl}"),
+            ('Filtration Duration',         f"{op_cond.get('filtration_duration_min', 0):.1f} min"),
+            ('Backwash Duration',           f"{op_cond.get('backwash_duration_min', 0):.1f} min"),
+        ], widths=(7.5, 6.5))
+        _spacer(doc)
+        
+        doc.add_page_break()
+
     def _page_system_overview(self, doc, sr):
         pd = sr.get('project_details', {})
         proj_name = pd.get('name') or sr.get('project_name', 'PACE Report')
@@ -1502,6 +1532,9 @@ class ReportGenerator:
         mem2         = sr.get('pass2_membrane', mem1)
 
         # ── Page 1 ────────────────────────────────────────────────────────────
+        if sr.get('uf_results') and 'UF' in train:
+            self._page_uf_overview(doc, sr)
+
         self._page_system_overview(doc, sr)
 
         # ── Page 2: Stage + Element tables ───────────────────────────────────
