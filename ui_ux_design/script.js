@@ -1242,6 +1242,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         .then(res => res.json())
                         .then(data => {
                             if(data.ro_membranes) {
+                                if (!window.roMembranes) window.roMembranes = {};
+                                data.ro_membranes.forEach(m => {
+                                    if (!window.roMembranes[m.id]) window.roMembranes[m.id] = {};
+                                    window.roMembranes[m.id].active_area_m2 = m.area;
+                                    window.roMembranes[m.id].manufacturer = m.manufacturer;
+                                    window.roMembranes[m.id].type = m.type;
+                                });
+
                                 const permionicsMems = data.ro_membranes.filter(m => m.manufacturer && m.manufacturer.toLowerCase() === 'permionics');
                                 const roOptions = permionicsMems.map(m => `<option value="${m.id}">${m.name} (${m.type})</option>`).join('');
                                 

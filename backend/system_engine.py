@@ -791,7 +791,9 @@ class SystemEngine:
             # Each element area ~37 m2 (8040 element), design flux = 20 LMH
             # Permeate per element = 37 * 20 / 1000 = 0.74 m3/h
             # Min elements needed = required_perm / 0.74
-            elem_area_m2 = 37.0
+            p2_mem_model = pass2_cfg.get("membrane", "BW30-400")
+            p2_membrane = MembraneDatabase.get_ro_membrane(p2_mem_model)
+            elem_area_m2 = p2_membrane.get("active_area_m2", 37.0) if p2_membrane else 37.0
             design_flux_lmh = 20.0
             perm_per_elem = (elem_area_m2 * design_flux_lmh) / 1000.0  # m3/h
             required_perm = p1_perm_flow * p2_target_rec
