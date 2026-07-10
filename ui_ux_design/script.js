@@ -2405,24 +2405,22 @@ function calculateChemistry(showAllResults = false) {
         ionicStrength += 0.5 * (molL * Math.pow(z, 2));
     });
 
-    // Add neutral species like silica to TDS
-    const sio2 = parseFloat(document.getElementById('sio2').value) || 0;
-    calculatedTds += sio2;
-    
-    // Add additional fouling indicators that act as solutes to TDS (Aluminium, Iron, Manganese)
+
+    // Add additional fouling indicators that act as solutes (Aluminium, Iron, Manganese)
     const alVal = parseFloat((document.getElementById('al') || {}).value) || 0;
     const feVal = parseFloat(document.getElementById('fe').value) || 0;
     const mnVal = parseFloat(document.getElementById('mn').value) || 0;
-    calculatedTds += alVal + feVal + mnVal;
     
+    calculatedTds += alVal + feVal + mnVal;
+
     // Update Silica row displays (neutral species)
     const sio2MeqEl = document.getElementById('sio2-meq');
     const sio2Caco3El = document.getElementById('sio2-caco3');
     if (sio2MeqEl) sio2MeqEl.textContent = '0.0000';
     if (sio2Caco3El) sio2Caco3El.textContent = '0.00';
 
-    // Update Table Totals Live
-    const grandTotalMg = totalCatMg + totalAnMg;
+    // Update Table Totals Live (Including trace metals in mg/L total)
+    const grandTotalMg = totalCatMg + totalAnMg + alVal + feVal + mnVal;
     const grandTotalMeq = totalCatMeq + totalAnMeq;
     const grandTotalCaCO3 = totalCatCaCO3 + totalAnCaCO3;
 
