@@ -313,9 +313,9 @@ class ProcessRecommendationEngine:
         if has_crit:
             self._add_flag(f"CRITICAL {limiting} scaling detected at {target}% target recovery. Recovery may not be feasible.")
             
-            if limiting == "SiO2(a)" and target >= 80:
+            if limiting == "SiO2(a)":
                 self.state["high_ph_ro_hint"] = True
-                self._add_flag("High pH RO configuration hinted: high silica at high target recovery.")
+                self._add_flag("High pH RO configuration hinted: critical silica scaling detected.")
 
     def _phase_5_permeate_quality(self):
         tds = self.data.feed_tds
