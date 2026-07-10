@@ -314,8 +314,8 @@ class ProcessRecommendationEngine:
             self._add_flag(f"CRITICAL {limiting} scaling detected at {target}% target recovery. Recovery may not be feasible.")
             
             if limiting == "SiO2(a)" and target >= 80:
-                self.state["hero_hint"] = True
-                self._add_flag("HERO configuration hinted: high silica at high target recovery.")
+                self.state["high_ph_ro_hint"] = True
+                self._add_flag("High pH RO configuration hinted: high silica at high target recovery.")
 
     def _phase_5_permeate_quality(self):
         tds = self.data.feed_tds
@@ -407,6 +407,6 @@ class ProcessRecommendationEngine:
         if app == "ZLD":
             self._add_flag("ZLD Application: RO max recovery 85%. Downstream brine concentrator/crystalliser required.")
             
-        if self.state.get("hero_hint"):
-            self.state["primary_config"] = "HERO"
+        if self.state.get("high_ph_ro_hint"):
+            self.state["primary_config"] = "High pH RO"
             self.state["alternate_config"] = "UF+RO (at reduced recovery)"
