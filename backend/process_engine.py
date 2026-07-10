@@ -86,7 +86,7 @@ class ProcessRecommendationEngine:
             self.state["confidence"]["missing_inputs"].append("ionic_data")
             self._update_confidence_level()
             self.state["flags"].append("RECOVERY UNVERIFIED: Missing ionic data. Phase 4 skipped.")
-            self.state["recovery"]["feasible"] = False
+
 
         self._phase_5_permeate_quality()
         self._phase_6_nf_refinement()
