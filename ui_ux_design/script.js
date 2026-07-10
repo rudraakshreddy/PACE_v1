@@ -1636,22 +1636,7 @@ async function fetchProcessRecommendation() {
         document.getElementById('process-confidence-level').style.background = `rgba(${ringColor === 'var(--success-color)' ? '34,197,94' : (ringColor === 'var(--warning-color)' ? '245,158,11' : '239,68,68')}, 0.2)`;
         document.getElementById('process-confidence-level').style.color = ringColor;
 
-        // Recovery Feasibility
-        document.getElementById('process-target-rec').textContent = `${result.recovery.target}%`;
-        document.getElementById('process-max-rec').textContent = `${result.recovery.max_recommended}%`;
-        
-        const fStat = document.getElementById('process-feasibility-status');
-        if(result.recovery.feasible) {
-            fStat.textContent = "FEASIBLE";
-            fStat.style.color = "#86efac";
-            fStat.style.background = "rgba(34, 197, 94, 0.15)";
-            fStat.style.borderColor = "rgba(34, 197, 94, 0.3)";
-        } else {
-            fStat.textContent = `LIMIT: ${result.recovery.limiting_factor || "CEILING"}`;
-            fStat.style.color = "#fca5a5";
-            fStat.style.background = "rgba(239, 68, 68, 0.15)";
-            fStat.style.borderColor = "rgba(239, 68, 68, 0.3)";
-        }
+
 
         // 1. Run client-side pre-treatment first
         calculatePreTreatment(true);

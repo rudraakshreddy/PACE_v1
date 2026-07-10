@@ -53,12 +53,7 @@ class ProcessRecommendationEngine:
             "second_pass_required": False,
             "second_pass_high_ph": False,
             "alternate_config": None,
-            "recovery": {
-                "target": 0,
-                "feasible": True,
-                "max_recommended": 0,
-                "limiting_factor": None
-            },
+
             "scaling_risks": {},
             "flags": [],
             "pretreatment_flags": [],
@@ -72,8 +67,6 @@ class ProcessRecommendationEngine:
 
     def run(self, data: ProcessInputData) -> Dict[str, Any]:
         self.data = data
-        self.state["recovery"]["target"] = data.target_recovery
-        self.state["recovery"]["max_recommended"] = data.target_recovery
 
         self._phase_0_confidence()
         if self.state["halt"]: return self.state
@@ -309,7 +302,7 @@ class ProcessRecommendationEngine:
         return risks, has_crit, limiting
 
     def _phase_4_scaling(self):
-        target = self.state["recovery"]["target"]
+        target = self.data.target_recovery
         
         cf = 1 / (1 - target / 100)
         sis = self._run_phreeqc_cf(cf)
@@ -318,8 +311,6 @@ class ProcessRecommendationEngine:
         self.state["scaling_risks"] = risks
         
         if has_crit:
-            self.state["recovery"]["feasible"] = False
-            self.state["recovery"]["limiting_factor"] = limiting
             self._add_flag(f"CRITICAL {limiting} scaling detected at {target}% target recovery. Recovery may not be feasible.")
             
             if limiting == "SiO2(a)" and target >= 80:
