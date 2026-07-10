@@ -170,7 +170,7 @@ class SystemEngine:
             uf_res = self.uf_engine.simulate_uf(
                 gross_feed_flow_m3h=target_flow,
                 temp_c=feed.get("temperature", 25.0),
-                module_name=input_data.get("uf_module", "IntegraTec-SFD-2880"),
+                module_name=input_data.get("uf_module", "PERMA-UF-i0875s40"),
                 feed_turbidity=feed.get("turbidity", 20.0),
                 feed_tss=feed.get("tss", 30.0),
                 feed_tds=feed.get("tds", sum([v for k,v in feed.items() if isinstance(v, (int, float)) and k not in ["temperature", "ph", "turbidity", "tss", "tds"]])),
@@ -428,7 +428,7 @@ class SystemEngine:
                 
                 uf_res = result.get("uf_results")
                 if uf_res:
-                    uf_mod_name = input_data.get("uf_module", "IntegraTec-SFD-2880")
+                    uf_mod_name = input_data.get("uf_module", "PERMA-UF-i0875s40")
                     uf_mod = MembraneDatabase.get_uf_module(uf_mod_name)
                     n_uf_modules = uf_res["overview"]["total_modules"]
                     
@@ -536,7 +536,7 @@ class SystemEngine:
                 }
 
         result["ro_membrane"] = input_data.get("ro_membrane", "BW30-400")
-        result["uf_module"] = input_data.get("uf_module", "IntegraTec-SFD-2880")
+        result["uf_module"] = input_data.get("uf_module", "PERMA-UF-i0875s40")
         result["stages_count"] = input_data.get("stages", 2)
         result["vessels_per_stage"] = input_data.get("vessels_per_stage", [4, 2])
         result["elements_per_vessel"] = input_data.get("elements_per_vessel", 6)
@@ -867,7 +867,7 @@ class SystemEngine:
             "pass2_results": final_p2_res,
             "ro_membrane": pass1_cfg.get("ro_membrane", "BW30-400"),
             "pass2_membrane": pass2_cfg.get("ro_membrane", "BW30-400"),
-            "uf_module": input_data.get("uf_module", "IntegraTec-SFD-2880"),
+            "uf_module": input_data.get("uf_module", "PERMA-UF-i0875s40"),
             "stages_count": pass1_cfg.get("stages", 2),
             "vessels_per_stage": pass1_cfg.get("vessels_per_stage", [4, 2]),
             "elements_per_vessel": pass1_cfg.get("elements_per_vessel", 6),
