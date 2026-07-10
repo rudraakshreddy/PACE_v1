@@ -3,7 +3,7 @@ Live API test against the running server — POST /api/calculate-system-physics
 """
 import urllib.request, base64, json, time
 
-CREDS = base64.b64encode(b'user:password123').decode()
+CREDS = base64.b64encode(b'pace_permionics:satyaraj_permionics@2026').decode()
 BASE = 'http://localhost:8000'
 
 payload = {

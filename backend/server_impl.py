@@ -60,8 +60,8 @@ class BasicAuthASGIMiddleware:
                 if auth_type.lower() == "basic":
                     decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
                     username, password = decoded_creds.split(":", 1)
-                    expected_user = os.environ.get("API_USERNAME", "user")
-                    expected_pass = os.environ.get("API_PASSWORD", "password123")
+                    expected_user = os.environ.get("API_USERNAME", "pace_permionics")
+                    expected_pass = os.environ.get("API_PASSWORD", "satyaraj_permionics@2026")
                     if username == expected_user and password == expected_pass:
                         authorized = True
             except Exception:

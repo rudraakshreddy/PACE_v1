@@ -32,7 +32,7 @@ payload = {
     "recycle": {"enabled": False, "recycle_ratio": 0.0}
 }
 
-r = requests.post("http://127.0.0.1:8000/api/calculate-system-physics", json=payload, auth=("user", "password123"))
+r = requests.post("http://127.0.0.1:8000/api/calculate-system-physics", json=payload, auth=("pace_permionics", "satyaraj_permionics@2026"))
 try:
     data = r.json()
     with open("snapshots.json", "w", encoding="utf-8") as f:

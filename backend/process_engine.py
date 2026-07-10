@@ -310,28 +310,19 @@ class ProcessRecommendationEngine:
 
     def _phase_4_scaling(self):
         target = self.state["recovery"]["target"]
-        current = target
-        actual_limiting = None
         
-        while current >= 30:
-            cf = 1 / (1 - current / 100)
-            sis = self._run_phreeqc_cf(cf)
-            risks, has_crit, limiting = self._eval_scaling(sis)
-            
-            if not has_crit:
-                break
-            actual_limiting = limiting
-            current -= 5
+        cf = 1 / (1 - target / 100)
+        sis = self._run_phreeqc_cf(cf)
+        risks, has_crit, limiting = self._eval_scaling(sis)
             
         self.state["scaling_risks"] = risks
         
-        if current < target:
+        if has_crit:
             self.state["recovery"]["feasible"] = False
-            self.state["recovery"]["max_recommended"] = max(current, 0)
-            self.state["recovery"]["limiting_factor"] = actual_limiting
-            self._add_flag(f"Recovery ceiling solver reduced recovery from {target}% to {current}% due to CRITICAL {actual_limiting} scaling.")
+            self.state["recovery"]["limiting_factor"] = limiting
+            self._add_flag(f"CRITICAL {limiting} scaling detected at {target}% target recovery. Recovery may not be feasible.")
             
-            if actual_limiting == "SiO2(a)" and target >= 80:
+            if limiting == "SiO2(a)" and target >= 80:
                 self.state["hero_hint"] = True
                 self._add_flag("HERO configuration hinted: high silica at high target recovery.")
 
