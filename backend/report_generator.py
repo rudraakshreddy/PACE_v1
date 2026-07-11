@@ -874,7 +874,8 @@ class ReportGenerator:
 
         # ── System overview table ──
         vps  = sm.get('vessels_per_stage', [1])
-        n_el = len(ro_main.get('elements', []))
+        epv  = sr.get('elements_per_vessel', sm.get('elements_per_vessel', 6))
+        n_el = sum(vps) * epv
         _heading(doc, 'RO System Overview')
 
         # Top row: units / recovery summary
@@ -943,7 +944,7 @@ class ReportGenerator:
             fp        = s_el[0].get('feed_pressure', 0)
             cp        = s_el[-1].get('conc_pressure', 0)
             dp        = fp - cp
-            epv       = len(s_el) // vs if vs else len(s_el)
+            epv       = len(s_el)
             stage_rows.append([
                 str(sn), membrane, str(vs), str(epv),
                 f"{conv_flow(stg['feed_flow'], ud):.1f}",  f"{conv_press(fp, ud):.1f}",
