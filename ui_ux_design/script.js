@@ -3,7 +3,7 @@ window.isProjectDirty = false;
 
 // Login state management
 window.addEventListener('DOMContentLoaded', () => {
-    const authData = localStorage.getItem('pace_auth');
+    const authData = sessionStorage.getItem('pace_auth');
     if (!authData) {
         document.getElementById('login-overlay').style.display = 'flex';
     } else {
@@ -27,7 +27,7 @@ window.handleLoginSubmit = async function(e) {
         });
         
         if (res.ok) {
-            localStorage.setItem('pace_auth', encoded);
+            sessionStorage.setItem('pace_auth', encoded);
             document.getElementById('login-overlay').style.display = 'none';
         } else {
             document.getElementById('login-error').style.display = 'block';
@@ -69,7 +69,7 @@ window.fetch = async function(...args) {
     const startTime = Date.now();
     try {
         if (url && typeof url === 'string' && (url.includes('localhost:8000') || url.includes('/api/') || url.includes('robust-integrity'))) {
-            const auth = localStorage.getItem('pace_auth');
+            const auth = sessionStorage.getItem('pace_auth');
             if (auth) {
                 const opts = args[1] || {};
                 opts.headers = opts.headers || {};
