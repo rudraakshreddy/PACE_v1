@@ -1133,9 +1133,20 @@ class ReportGenerator:
                     risk = 'LOW';      rec = 'Monitor. No immediate action required.'
                 
                 f_si_val = feed_si.get(mineral)
-                f_si_str = f'{f_si_val:+.3f}' if f_si_val is not None else '—'
-                si_rows.append([mineral, lim['formula'], f_si_str, f'{si_val:+.3f}', risk, rec])
-
+                
+                if si_val <= -99:
+                    risk = 'NONE'
+                    rec = 'Constituent ions not present.'
+                    si_str = '—'
+                else:
+                    si_str = f'{si_val:+.3f}'
+                    
+                if f_si_val is not None and f_si_val > -99:
+                    f_si_str = f'{f_si_val:+.3f}'
+                else:
+                    f_si_str = '—'
+                    
+                si_rows.append([mineral, lim['formula'], f_si_str, si_str, risk, rec])
             if conc_ph is not None:
                 # Add Feed pH if available
                 feed_ph_val = ro_results.get('feed', {}).get('ph') if 'feed' in ro_results else '—'

@@ -4620,9 +4620,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (!lim) continue;
                             let risk = 'NONE';
                             let rec  = 'No action required.';
-                            if (siVal > lim.crit)       { risk = 'CRITICAL'; rec = lim.rec_crit; }
-                            else if (siVal > lim.high)  { risk = 'HIGH';     rec = lim.rec_high; }
-                            else if (siVal > lim.mod)   { risk = 'MODERATE'; rec = lim.rec_mod; }
+                            let displayVal = siVal.toFixed(3);
+                            
+                            if (siVal <= -99) {
+                                displayVal = '--';
+                                rec = 'Constituent ions not present.';
+                            } else if (siVal > lim.crit) { risk = 'CRITICAL'; rec = lim.rec_crit; }
+                            else if (siVal > lim.high)   { risk = 'HIGH';     rec = lim.rec_high; }
+                            else if (siVal > lim.mod)    { risk = 'MODERATE'; rec = lim.rec_mod; }
                             else if (siVal > lim.mod - 0.2) { risk = 'LOW'; rec = 'Monitor. No immediate action required.'; }
 
                             const rs = RISK_STYLES[risk];
@@ -4630,7 +4635,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <tr>
                                     <td style="text-align:left; font-weight:600;">${mineral}</td>
                                     <td style="color:var(--text-secondary); font-size:0.8rem;">${lim.formula}</td>
-                                    <td style="font-weight:700; color:${siVal > 0 ? (risk === 'CRITICAL' ? '#ef4444' : risk === 'HIGH' ? '#f97316' : '#f59e0b') : 'var(--text-secondary)'};">${siVal.toFixed(3)}</td>
+                                    <td style="font-weight:700; color:${siVal > 0 ? (risk === 'CRITICAL' ? '#ef4444' : risk === 'HIGH' ? '#f97316' : '#f59e0b') : 'var(--text-secondary)'};">${displayVal}</td>
                                     <td><span style="font-size:0.72rem; font-weight:700; color:${rs.color};">${rs.label}</span></td>
                                 </tr>`;
                         }
