@@ -865,7 +865,7 @@ class ReportGenerator:
             [
                 ['1', 'Raw Feed to RO System',           f"{conv_flow(sr.get('target_flow_m3h', sm.get('feed_flow', 0)), ud):.1f}",  f"{sm.get('feed_tds', 0):.1f}", '0.0'],
                 ['2', 'Net Feed to Pass 1',               f"{conv_flow(sm.get('feed_flow', 0), ud):.1f}",  f"{sm.get('feed_tds', 0):.1f}", f"{conv_press(sm.get('feed_pressure_bar', 0), ud):.1f}"],
-                ['4', 'Total Concentrate from Pass 1',    f"{conv_flow(sm.get('conc_flow', 0), ud):.1f}",  f"{sm.get('conc_tds', 0):.0f}", '—'],
+                ['4', 'Total Concentrate from Pass 1',    f"{conv_flow(sm.get('conc_flow', 0), ud):.1f}",  f"{sm.get('conc_tds', 0):.0f}", f"{conv_press(sm.get('conc_pressure_bar', 0), ud):.1f}"],
                 ['6', 'Net Product from RO System',       f"{conv_flow(sm.get('perm_flow', 0), ud):.1f}",  f"{sm.get('perm_tds', 0):.2f}", '0.0'],
             ],
             col_widths=[0.7, 6.5, 2.5, 2.5, 2.2]

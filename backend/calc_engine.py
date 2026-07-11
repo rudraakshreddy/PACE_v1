@@ -641,6 +641,7 @@ class ROEngine:
             "conc_flow": current_feed_flow,
             "avg_flux_lmh": avg_flux,
             "feed_pressure_bar": feed_pressure_bar,
+            "conc_pressure_bar": stage_exit_pressure,
             "total_dp_bar": round(total_dp_bar, 2),
             "total_tmp_bar": round(total_tmp_bar, 2),
             "hp_pump_power_kw": round(hp_pump_power_kw, 2),
