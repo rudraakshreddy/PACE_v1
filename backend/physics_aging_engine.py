@@ -59,7 +59,6 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
     "Jb_seed":     1.0e-9,    # seeding flux [m/h]
     "dp_EPS":      8.0e-8,    # EPS fibre diameter [m]
     "eps_bf":      0.70,      # biofilm porosity
-    "tau_bf":      2.0,       # tortuosity
     "Lb_min":      1.0e-6,    # min biofilm thickness for EOP [m]
     "Lb_max":      1.5e-4,    # carrying capacity: 150 µm  (Vrouwenvelder 2010 CLSM autopsy: 50-150 µm on RO membranes)
 
@@ -83,7 +82,7 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
 
     # Compaction – Kelvin-Voigt (Sub-model V)
     "Em":          1.0e8,     # elastic modulus support [Pa]
-    "tau_c":       2000.0,    # creep retardation time [h]
+    "tau_c":       1000.0,    # creep retardation time [h]
     "eta_v":       1.0e12,    # viscous creep coefficient [Pa·h]
     "f_stress":    0.70,      # fraction of feed P as compressive stress
 
@@ -106,12 +105,6 @@ DEFAULT_PHYSICS_PARAMS: Dict[str, float] = {
     "kd_coll":     0.003,     # chelant colloidal cake removal [m/(s·M)] - calibrated for 90% removal in 4h
     "chelant_conc": 0.05,     # chelant concentration [M]
 
-    # CIP trigger thresholds (ASTM / industry standard)
-    "NPF_cip_trigger":     0.90,  # 10% drop
-    "NDP_ratio_cip_trigger": 1.15,
-    "NSP_ratio_cip_trigger": 1.10,
-    "FRI_cip_trigger":     0.60,
-
     # Membrane replacement thresholds
     "NPF_replace_trigger": 0.70,
     "SEC_replace_trigger": 1.50,
@@ -132,7 +125,7 @@ DEFAULT_PHYSICS_PARAMS.update({
     "Kd":          3.0e-6,       # deposition rate [s/m]  (increased for visible accumulation)
     "K_rem":       5.0e-7,       # removal rate [m²/(Pa·s)]
     "Cb":          0.005,        # bulk particle conc [kg/m³]
-    "alpha0":      5.0e11,       # specific cake resistance at ref TMP [m/kg]
+    "r_c0":        5.0e11,       # specific cake resistance at ref TMP [m/kg]
 
     # Biofouling (Sub-model II) — calibrated for realistic RO plant community
     # Literature (Bereschenko 2010, Vrouwenvelder 2010): mu_net ~ 0.005-0.04 h-1, doubling ~17h-10 days
@@ -154,7 +147,7 @@ DEFAULT_PHYSICS_PARAMS.update({
     # Compaction — moderate creep (tau_c = 500h so full compaction by Year 1)
     "Em":          2.0e8,        # elastic modulus [Pa]
     "f_stress":    0.50,         # fraction of feed P as compressive stress
-    "tau_c":       500.0,        # retardation time [h] — faster compaction saturation
+    "tau_c":       1000.0,       # retardation time [h]
 
     # Replacement
     "SEC_replace_trigger": 1.50,  # 50% SEC increase
@@ -1255,8 +1248,8 @@ class PhysicsAgingEngine:
         """Cake resistance [m⁻¹] from cake mass [kg/m²]."""
         p  = self.p
         TMP_ref_Pa = p["TMP_ref"] * 1.0e5
-        alpha = p["alpha0"] * ((max(TMP_Pa, 1.0) / TMP_ref_Pa) ** p["sc"])
-        return alpha * mc
+        r_c = p["r_c0"] * ((max(TMP_Pa, 1.0) / TMP_ref_Pa) ** p["sc"])
+        return r_c * mc
 
     def _rb(self, Lb: float) -> float:
         """Biofilm (EOP) resistance [m⁻¹] from biofilm thickness [m]."""
@@ -1265,7 +1258,7 @@ class PhysicsAgingEngine:
             return 0.0
         dp  = p["dp_EPS"]
         eps = p["eps_bf"]
-        tau = p["tau_bf"]
+        tau = 1.0 / (eps ** 3)
         # Kozeny-Carman for fibrous biofilm
         rb = (180.0 * (1.0 - eps)**2 * tau * Lb) / (dp**2 * eps**3 + 1e-30)
         return rb
@@ -1401,8 +1394,8 @@ class PhysicsAgingEngine:
         pi_feed_Pa = pi_feed_bar * 1.0e5
         kM_avg = 5.0e-6
         Ds_T = 1.6e-9 * ((temp_c + 273.15) / 298.15)
-        tau_bf = 2.0
         eps_bf = 0.70
+        tau_bf = 1.0 / (eps_bf ** 3)
         rho_cake = self.p.get("rho_cake", 2000.0)
         eps_cake = self.p.get("eps_cake", 0.40)
         tau_cake = 1.0 / eps_cake
