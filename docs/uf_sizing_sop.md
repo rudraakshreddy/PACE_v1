@@ -64,9 +64,9 @@ NEW SEQUENCE (Intake-Limited):
 
 ---
 
-## 4. Impacted Documentation Files
+## 4. Summary of Impacted Modules
 
-The above logic changes and formulas have been successfully updated in:
-1. **[`PACE_Calculation_Module_SOP.docx`](file:///c:/Users/Rudraaksh/OneDrive/Desktop/intern_proj/PACE_Calculation_Module_SOP.docx)** (Section 4: UF Sizing Engine)
-2. **[`PACE_Calculation_Module_Specification.docx`](file:///c:/Users/Rudraaksh/OneDrive/Desktop/intern_proj/PACE_Calculation_Module_Specification.docx)** (Section 4.1: Hydraulic Balancing, Section 5.1: Technology Chaining)
-3. **[`PACE_Calculation_Module_SOP.md`](file:///C:/Users/Rudraaksh/.gemini/antigravity/brain/21f09c9b-3011-4b92-b822-7a71fe9c1602/PACE_Calculation_Module_SOP.md)** (Section 4)
+The above logic changes and formulas are implemented in:
+- `backend/uf_engine.py` — core UF sizing and flow balance calculations
+- `backend/system_engine.py` — technology chaining (UF → RO feed handoff)
+- `backend/server_impl.py` — API payload construction and result assembly
