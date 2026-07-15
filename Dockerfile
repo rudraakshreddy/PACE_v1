@@ -22,4 +22,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Start the server using run_app.py to ensure frontend is mounted and sys.path is correct
-CMD ["python", "backend/run_app.py"]
+CMD ["python", "backend/run_cloud.py"]
