@@ -1,4 +1,4 @@
-# PACE — Permionics Advanced Calculation Engine
+# PACE — Permionics Analytical Calculation Engine
 
 **PACE** is a professional-grade membrane process design tool developed for Permionics Membranes Pvt. Ltd. It enables engineers to design, simulate, and report on Reverse Osmosis (RO), Nanofiltration (NF), and Ultrafiltration (UF) systems.
 
